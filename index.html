@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>Fiche de maintenance PV</title>
+<style>
+:root{--bg:#f2f4f7;--card:#fff;--ink:#1a2330;--mute:#5b6678;--line:#d8dde5;--pri:#0b4f8a;--pri-ink:#fff;--ok:#1b7f3b;--okbg:#e4f5e9;--nok:#c62828;--nokbg:#fdeaea;--na:#6b7280;--nabg:#eceff3;--warn:#b26a00}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
+header.top{position:sticky;top:0;z-index:20;background:var(--pri);color:var(--pri-ink);display:flex;align-items:center;gap:8px;padding:10px 16px;padding-top:max(10px,env(safe-area-inset-top))}
+header.top h1{font-size:17px;margin:0;flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header.top .st{font-size:12px;opacity:.85}
+main{max-width:900px;margin:0 auto;padding:12px 16px 80px}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:10px 14px;min-height:44px;font-weight:500}
+.btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.danger{color:var(--nok);border-color:#e7b4b4}
+.btn.sm{min-height:36px;padding:6px 10px;font-size:14px}
+.btn.ghost{background:transparent;border-color:rgba(255,255,255,.5);color:#fff}
+.btn:disabled{opacity:.5}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+details.sec{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:10px 0}
+details.sec>summary{list-style:none;cursor:pointer;padding:14px;font-weight:600;display:flex;gap:8px;align-items:center;min-height:52px}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary::after{content:"▾";margin-left:auto;color:var(--mute)}
+details.sec[open]>summary::after{content:"▴"}
+details.sec>.in{padding:0 12px 12px}
+.badge{font-size:12px;font-weight:600;border-radius:99px;padding:2px 8px;background:var(--nabg);color:var(--na)}
+.badge.ok{background:var(--okbg);color:var(--ok)}.badge.nok{background:var(--nokbg);color:var(--nok)}.badge.warn{background:#fff1d6;color:var(--warn)}
+h3{font-size:15px;margin:16px 0 6px;color:var(--pri)}
+h3:first-child{margin-top:4px}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+label.f{display:block;font-size:13px;color:var(--mute)}
+label.f>span{display:block;margin-bottom:3px}
+input[type=text],input[type=date],input[type=number],input[type=url],input[type=search],select,textarea{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);min-height:44px}
+textarea{resize:vertical;field-sizing:content;min-height:44px}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--pri);outline-offset:0}
+.chk{display:flex;flex-wrap:wrap;gap:8px}
+.chk label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-height:44px;background:#fff}
+.chk input{width:20px;height:20px}
+.cl .tools{display:flex;justify-content:flex-end;margin-bottom:6px}
+.row{border-top:1px solid var(--line);padding:10px 0}
+.row:first-of-type{border-top:0}
+.row .lbl{font-size:15px}
+.row .lbl small{display:block;color:var(--mute);font-size:12px}
+.seg{display:flex;gap:6px;margin:8px 0 6px}
+.seg button{flex:1;min-height:44px;border:1px solid var(--line);background:#fff;border-radius:8px;font-weight:700;color:var(--mute)}
+.seg button.on[data-v=OK]{background:var(--ok);border-color:var(--ok);color:#fff}
+.seg button.on[data-v=NOK]{background:var(--nok);border-color:var(--nok);color:#fff}
+.seg button.on[data-v=NA]{background:var(--na);border-color:var(--na);color:#fff}
+.seg button[data-v=NA]{flex:.6}
+.row[data-r=NOK]{background:linear-gradient(90deg,var(--nokbg),transparent 60%)}
+.row[data-r=NOK] textarea:placeholder-shown{border-color:var(--nok);background:var(--nokbg)}
+.row textarea{min-height:40px;padding:8px}
+.strings .s{display:grid;grid-template-columns:64px 1fr 1fr 44px;gap:6px;margin:6px 0;align-items:center}
+.strings .s .o{grid-column:1/4}
+.strings .hd{display:grid;grid-template-columns:64px 1fr 1fr 44px;gap:6px;font-size:12px;color:var(--mute)}
+.photos{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.photo{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.photo img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#ddd}
+.photo .b{padding:8px;display:grid;gap:6px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.sig{border:2px dashed var(--line);border-radius:10px;background:#fff;touch-action:none;width:100%;aspect-ratio:600/220;display:block}
+.sig.done{border-style:solid}
+fieldset{border:0;padding:0;margin:0;min-width:0}
+.banner{border-radius:12px;padding:12px;margin:10px 0;font-weight:500}
+.banner.ok{background:var(--okbg);color:var(--ok)}.banner.warn{background:#fff1d6;color:var(--warn)}
+.hist{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.hist .t{flex:1;min-width:200px}
+.hist .t b{display:block}
+.hist .t small{color:var(--mute)}
+.hist .a{display:flex;gap:6px;flex-wrap:wrap}
+.tr{overflow-x:auto}
+.synth{border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;display:grid;gap:8px}
+dialog{border:0;border-radius:14px;max-width:min(560px,calc(100vw - 32px));width:100%;padding:16px}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h2{margin:0 0 8px;font-size:18px}
+dialog ul{padding-left:20px;margin:8px 0}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:50;background:#1a2330;color:#fff;border-radius:10px;padding:12px 14px;max-width:520px;margin:auto}
+.mute{color:var(--mute);font-size:13px}
+.empty{text-align:center;color:var(--mute);padding:24px}
+</style>
+</head>
+<body>
+<header class="top" id="top"></header>
+<main id="main"></main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script>
+"use strict";
+/* ============ CONFIG ============ */
+const CONFIG = {
+  to: "aurore.seyer@circet.fr",
+  // URL du flux Power Automate (déclencheur « Requête HTTP ») ou de tout service acceptant le POST JSON.
+  // Peut aussi être saisie dans ⚙ Réglages sur l'appareil.
+  endpoint: "",
+  ref: "FO E&M 004 v2"
+};
+
+/* ============ Référentiel (issu du Word) ============ */
+const V = "Visuel";
+const I = (...a) => a.map(l => [l, V]);
+const ITEMS = {
+  batiment: I("Modalités d'accès — préciser si problématique pour accéder à la centrale","Etat général de la structure — dégradation, corrosion, tenue mécanique","Test de continuité de la mise à la terre"),
+  local: I("Etat général de la structure — dégradation, corrosion, tenue mécanique","Contrôle de l'étanchéité","Etat des portes et de la serrurerie","Etat des grilles de ventilation","Test de continuité de la mise à la terre","Contrôle du bouton d'arrêt d'urgence","Contrôle des étiquettes signalétiques","Nettoyage du local"),
+  toiture: I("Présence d'ombres portées en toiture — depuis le sol si visite préventive niv.1 (VP1)","Etat général de la toiture — depuis le sol si VP1","Contrôle de l'étanchéité, absence de fuites et d'oxydation — depuis le sol si VP1","Etat de propreté en toiture — feuilles mortes, fientes, autres déchets","Enlèvement des corps étrangers dans les noues","Etat des capteurs — préciser le nombre de pyranomètres, sondes...","Etat des systèmes de fixation — dégradation, corrosion, tenue mécanique","Contrôle par échantillonnage de la fixation des modules sur tout le contour + ¼ du reste","Absence de tache, points chauds, délamination, fissures du verre et des cellules PV","Contrôle des câbles et chemins de câbles DC — chocs, fixation, traces de chauffe, rouille","Etat de la connectique","Contrôle des étiquettes signalétiques des câblages"),
+  comptage: I("Etat général de la structure — dégradation, corrosion, tenue mécanique","Contrôle de l'étanchéité","Nettoyage externe"),
+  hta: I("Etat général de la structure — dégradation, corrosion, tenue mécanique, traces","Contrôle de l'étanchéité","Contrôle visuel du jeu de barres / des borniers — couleur, déformation","Contrôle des connexions électriques — indiquer la valeur en cas de resserrage au couple","Thermographie — général, connecteurs, câbles","Test de continuité de la mise à la terre","Test de déclenchement manuel des disjoncteurs, sectionneurs et arrêt d'urgence","Test des protections différentielles","Contrôle des étiquettes signalétiques","Nettoyage externe et dépoussiérage des composants internes"),
+  tgbt: I("Etat général de la structure — dégradation, corrosion, tenue mécanique, traces","Contrôle de l'étanchéité","Contrôle visuel du jeu de barres / des borniers — couleur, déformation","Contrôle du non-déclenchement des parafoudres AC — remplacement si nécessaire","Contrôle des connexions électriques — indiquer la valeur en cas de resserrage au couple","Thermographie — général, connecteurs, câbles","Test de continuité de la mise à la terre","Test de déclenchement manuel des disjoncteurs, sectionneurs et arrêt d'urgence","Test des protections différentielles","Contrôle des étiquettes signalétiques","Nettoyage externe et dépoussiérage des composants internes"),
+  divis: I("Etat général de la structure — dégradation, corrosion, tenue mécanique","Contrôle de l'étanchéité","Contrôle des connexions électriques","Test de continuité de la mise à la terre","Contrôle des protections (disjoncteurs, différentiels)","Contrôle des étiquettes signalétiques","Nettoyage externe"),
+  securite: I("Présence et état des extincteurs — vérifier la date de contrôle et la pression","Présence et lisibilité de la signalétique et des consignes de sécurité","Etat des équipements de protection collective — garde-corps, lignes de vie, points d'ancrage","Etat des EPI mis à disposition sur site (le cas échéant)","Etat de l'éclairage de sécurité / balisage","Présence et validité de la trousse de premiers secours","Fonctionnement de l'arrêt d'urgence général du site","Etat des clôtures, portails et dispositifs anti-intrusion"),
+  supcoffret: I("Etat général de la structure — dégradation, corrosion, tenue mécanique","Contrôle de l'étanchéité","Nettoyage externe et dépoussiérage des composants internes"),
+  supmat: I("Etat de la fixation de l'antenne GSM","Vérification d'envoi d'alarme en cas de coupure — batterie suffisante","Etat des connexions","Etat du modem / routeur","Détection de l'intégralité du matériel","Etat du signal (GSM, internet)"),
+  onduleur: I("Absence de bruits anormaux","Etat général de la structure de l'onduleur — dégradation, corrosion, tenue mécanique, traces","Etat de l'écran / afficheur de l'onduleur","Contrôle de la fixation de l'onduleur","Contrôle des étiquettes signalétiques — numéro onduleur et autocollant d'avertissement","Contrôle des étiquettes signalétiques des câblages","Contrôle des câbles et chemins de câbles AC — chocs, fixation, traces de chauffe, rouille","Contrôle des connexions électriques — indiquer la valeur en cas de resserrage au couple","Thermographie — général, connecteurs, câbles","Test de l'appareil de coupure DC/AC — interrupteur / barrette de coupure, protection de découplage","Test de fonctionnement — varistances / parafoudres / fusibles / autres","Mesure de la tension à vide des strings — en circuit ouvert","Mesure de non-défaut de résistance d'isolement des strings — tensions polarité +/terre et -/terre","Mesure du courant en charge des départs vers onduleurs","Nettoyage extérieur, intérieur, du système de ventilation et des filtres"),
+  dc: I("Etat général de la structure — dégradation, corrosion, tenue mécanique, traces","Contrôle de l'étanchéité","Contrôle visuel du jeu de barres / des borniers — couleur, déformation","Contrôle des connexions électriques — indiquer la valeur en cas de resserrage au couple","Thermographie — général, connecteurs, câbles","Test de continuité de la mise à la terre","Contrôle des protections — portes fusibles, fusibles, inter-sectionneur","Contrôle des étiquettes signalétiques","Nettoyage externe et dépoussiérage des composants internes"),
+  fin: I("Vérifier le fonctionnement de tous les onduleurs et de la supervision","Vérifier la fermeture de tous les coffrets, armoires et locaux techniques","Vérifier la fermeture du site (portail, clôture, crinoline)")
+};
+const SECTIONS = {1:"1. Bâtiment, local technique et toiture",2:"2. Système de comptage",3:"3. Armoires AC",4:"4. Équipements de sécurité",5:"5. Système de supervision",6:"6. Onduleur(s) et coffret(s) DC",8:"8. Fin d'intervention"};
+const MAINT_TYPES = ["Préventive","Curative","Annuelle","Autre"];
+const CRITS = ["Non-conformité / critique","Remarque non critique"];
+
+/* ============ Utilitaires ============ */
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const clone = o => JSON.parse(JSON.stringify(o));
+const today = () => new Date().toISOString().slice(0, 10);
+const fmtDate = d => d ? new Date(d).toLocaleDateString("fr-FR") : "";
+const fmtDT = d => d ? new Date(d).toLocaleString("fr-FR", {dateStyle:"short", timeStyle:"short"}) : "";
+function h(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "class") e.className = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "value") e.value = v ?? "";
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat(Infinity)) { if (c == null || c === false) continue; e.append(c.nodeType ? c : document.createTextNode(c)); }
+  return e;
+}
+function toast(msg, ms = 3500) {
+  document.querySelectorAll(".toast").forEach(t => t.remove());
+  const t = h("div", {class: "toast", role: "status"}, msg); document.body.append(t);
+  setTimeout(() => t.remove(), ms);
+}
+function modal(title, body, buttons) {
+  return new Promise(res => {
+    const d = h("dialog", {}, h("h2", {}, title), body,
+      h("div", {class: "bar", style: "justify-content:flex-end"}, buttons.map(b =>
+        h("button", {class: "btn " + (b.cls || ""), onclick: () => { d.close(); d.remove(); res(b.val); }}, b.label))));
+    d.addEventListener("cancel", () => { d.remove(); res(null); });
+    document.body.append(d); d.showModal();
+  });
+}
+const ask = (title, text) => modal(title, h("p", {}, text), [{label: "Annuler", val: false}, {label: "Confirmer", val: true, cls: "pri"}]);
+
+/* ============ Stockage (IndexedDB — historique local sans compte) ============ */
+const DB = {
+  _db: null,
+  open() {
+    if (this._db) return Promise.resolve(this._db);
+    return new Promise((res, rej) => {
+      const r = indexedDB.open("fiche-maintenance-pv", 1);
+      r.onupgradeneeded = () => { const d = r.result; d.createObjectStore("reports", {keyPath: "id"}); d.createObjectStore("meta", {keyPath: "id"}); };
+      r.onsuccess = () => { this._db = r.result; res(r.result); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  async tx(stores, mode, fn) {
+    const d = await this.open();
+    return new Promise((res, rej) => {
+      const t = d.transaction(stores, mode); let out;
+      out = fn(t); t.oncomplete = () => res(out && out.result !== undefined ? out.result : out); t.onerror = () => rej(t.error);
+    });
+  },
+  put(rep) { return this.tx(["reports", "meta"], "readwrite", t => { t.objectStore("reports").put(rep); t.objectStore("meta").put(metaOf(rep)); }); },
+  get(id) { return this.tx(["reports"], "readonly", t => t.objectStore("reports").get(id)); },
+  all() { return this.tx(["meta"], "readonly", t => t.objectStore("meta").getAll()); },
+  del(id) { return this.tx(["reports", "meta"], "readwrite", t => { t.objectStore("reports").delete(id); t.objectStore("meta").delete(id); }); }
+};
+function metaOf(s) {
+  return {id: s.id, client: s.g.client, site: s.g.adresse, date: s.g.dateVisite, status: s.status, nok: collectTables(s).reduce((n, t) => n + Object.values(t.rows).filter(r => r.r === "NOK").length, 0), updatedAt: s.updatedAt, signedAt: s.signedAt, sentAt: s.sentAt, tech: s.g.technicien};
+}
+const settings = {
+  get endpoint() { try { return localStorage.getItem("pv.endpoint") || CONFIG.endpoint; } catch { return CONFIG.endpoint; } },
+  set endpoint(v) { try { localStorage.setItem("pv.endpoint", v); } catch {} },
+  get tech() { try { return localStorage.getItem("pv.tech") || ""; } catch { return ""; } },
+  set tech(v) { try { localStorage.setItem("pv.tech", v); } catch {} }
+};
+
+/* ============ Modèle ============ */
+function newInverter() { return {id: uid(), marque: "", modele: "", serie: "", mppt: "", puissance: "", risoP: "", risoM: "", rows: {}, strings: []}; }
+function newReport() {
+  return {
+    id: uid(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), status: "draft",
+    g: {client: "", projet: "", designation: "", adresse: "", miseService: "", dateVisite: today(), types: [], typeAutre: "", intervention: "", societe: "Circet Energy", technicien: settings.tech, meteo: "", temperature: ""},
+    comBat: "", accesToiture: "", t: {}, divis: [], dcs: [], photos: [],
+    htaApplicable: false, index: {prod: "", conso: ""}, sup: {marque: "", modele: "", commentaires: ""},
+    comOnd: "", inverters: [newInverter()], synth: [], fin: {date: "", meteo: ""},
+    sig: {tech: "", client: ""}, clientName: "", signedAt: null, sentAt: null
+  };
+}
+function duplicateOf(s) {
+  const n = newReport();
+  Object.assign(n.g, {client: s.g.client, projet: s.g.projet, designation: s.g.designation, adresse: s.g.adresse, miseService: s.g.miseService, societe: s.g.societe, technicien: settings.tech || s.g.technicien});
+  n.htaApplicable = s.htaApplicable; n.sup.marque = s.sup.marque; n.sup.modele = s.sup.modele;
+  n.divis = s.divis.map(d => ({id: uid(), name: d.name, rows: {}}));
+  n.dcs = s.dcs.map(d => ({id: uid(), name: d.name, rows: {}}));
+  n.inverters = s.inverters.map(o => ({...newInverter(), marque: o.marque, modele: o.modele, serie: o.serie, mppt: o.mppt, puissance: o.puissance, strings: o.strings.map(x => ({id: uid(), n: x.n, i: "", v: "", obs: ""}))}));
+  return n;
+}
+const tbl = (s, key) => (s.t[key] ||= {});
+function collectTables(s) {
+  const out = [];
+  const add = (sec, title, items, rows, key) => out.push({sec, title, items, rows, key});
+  add(1, "Bâtiment / structure porteuse", ITEMS.batiment, tbl(s, "batiment"), "batiment");
+  add(1, "Local technique", ITEMS.local, tbl(s, "local"), "local");
+  add(1, "Toiture", ITEMS.toiture, tbl(s, "toiture"), "toiture");
+  add(2, "Coffret de comptage", ITEMS.comptage, tbl(s, "comptage"), "comptage");
+  if (s.htaApplicable) add(2, "Poste de livraison HTA / Tarif jaune-vert", ITEMS.hta, tbl(s, "hta"), "hta");
+  add(3, "Tableau Général Basse Tension (TGBT)", ITEMS.tgbt, tbl(s, "tgbt"), "tgbt");
+  s.divis.forEach((d, i) => add(3, "Tableau divisionnaire " + (d.name || i + 1), ITEMS.divis, d.rows, "divis" + d.id));
+  add(4, "Équipements de sécurité", ITEMS.securite, tbl(s, "securite"), "securite");
+  add(5, "Coffret de supervision", ITEMS.supcoffret, tbl(s, "supcoffret"), "supcoffret");
+  add(5, "État du matériel de supervision", ITEMS.supmat, tbl(s, "supmat"), "supmat");
+  s.inverters.forEach((o, i) => add(6, "Onduleur n° " + (i + 1), ITEMS.onduleur, o.rows, "ond" + o.id));
+  s.dcs.forEach((d, i) => add(6, "Coffret DC " + (d.name || i + 1), ITEMS.dc, d.rows, "dc" + d.id));
+  add(8, "Vérifications de fin d'intervention", ITEMS.fin, tbl(s, "fin"), "fin");
+  return out;
+}
+
+/* ============ État applicatif ============ */
+let cur = null, saveTimer = null, ro = false, openSecs = new Set([0]), pendingFocus = null;
+const $main = document.getElementById("main"), $top = document.getElementById("top");
+
+function save() {
+  if (ro || !cur) return;
+  cur.updatedAt = new Date().toISOString();
+  setSt("Enregistrement…");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 400);
+}
+async function saveNow() {
+  clearTimeout(saveTimer); saveTimer = null;
+  if (!cur) return;
+  try { await DB.put(cur); setSt("Enregistré ✓"); } catch (e) { setSt("⚠ Erreur d'enregistrement"); console.error(e); }
+}
+function setSt(t) { const e = document.getElementById("st"); if (e) e.textContent = t; }
+
+/* ============ Vue Accueil / historique ============ */
+async function showHome() {
+  if (cur) await saveNow();
+  cur = null; ro = false;
+  $top.replaceChildren(h("h1", {}, "Maintenance centrale PV"), h("button", {class: "btn ghost sm", onclick: openSettings, "aria-label": "Réglages"}, "⚙ Réglages"));
+  const list = h("div");
+  const q = h("input", {type: "search", placeholder: "Rechercher (client, site, technicien…)", oninput: () => draw()});
+  let metas = [];
+  try { metas = (await DB.all()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); } catch (e) { list.append(h("div", {class: "banner warn"}, "Stockage local indisponible (navigation privée ?). L'historique ne sera pas conservé.")); }
+  function draw() {
+    const f = q.value.toLowerCase();
+    const rows = metas.filter(m => !f || [m.client, m.site, m.tech].join(" ").toLowerCase().includes(f));
+    list.replaceChildren(...(rows.length ? rows.map(card) : [h("div", {class: "empty"}, metas.length ? "Aucun résultat." : "Aucune fiche pour l'instant. Commencez avec « Nouvelle fiche ».")]));
+  }
+  function card(m) {
+    const st = m.status === "draft" ? ["Brouillon", ""] : m.status === "sent" ? ["Signée · envoyée", "ok"] : ["Signée · à envoyer", "warn"];
+    return h("div", {class: "card hist"},
+      h("div", {class: "t"}, h("b", {}, m.client || "(client non renseigné)"), h("small", {}, [m.site, fmtDate(m.date), m.tech].filter(Boolean).join(" · ")),
+        h("div", {class: "bar"}, h("span", {class: "badge " + st[1]}, st[0]), m.nok ? h("span", {class: "badge nok"}, m.nok + " NOK") : null)),
+      h("div", {class: "a"},
+        h("button", {class: "btn sm pri", onclick: () => openReport(m.id)}, m.status === "draft" ? "Reprendre" : "Consulter"),
+        m.status === "pending" ? h("button", {class: "btn sm", onclick: () => resend(m.id)}, "Renvoyer") : null,
+        h("button", {class: "btn sm", onclick: async () => { const s = await DB.get(m.id); const n = duplicateOf(s); cur = n; await saveNow(); openReport(n.id); }}, "Dupliquer"),
+        h("button", {class: "btn sm", onclick: async () => { const s = await DB.get(m.id); downloadPdf(s); }}, "PDF"),
+        h("button", {class: "btn sm danger", onclick: async () => { if (await ask("Supprimer cette fiche ?", "Cette action est définitive sur cet appareil.")) { await DB.del(m.id); showHome(); } }}, "Supprimer")));
+  }
+  $main.replaceChildren(
+    h("div", {class: "bar"}, h("button", {class: "btn pri", style: "flex:1", onclick: async () => { cur = newReport(); await saveNow(); openReport(cur.id); }}, "＋ Nouvelle fiche")),
+    q, h("div", {class: "mute", style: "margin:8px 0"}, "Historique enregistré sur cet appareil (pas de compte)."), list);
+  draw();
+  window.scrollTo(0, 0);
+}
+async function openSettings() {
+  const ep = h("input", {type: "url", value: settings.endpoint, placeholder: "https://prod-xx.westeurope.logic.azure.com/…"});
+  const r = await modal("Réglages", h("div", {class: "grid", style: "grid-template-columns:1fr"},
+    h("label", {class: "f"}, h("span", {}, "Destinataire (fixe)"), h("input", {type: "text", value: CONFIG.to, disabled: true})),
+    h("label", {class: "f"}, h("span", {}, "URL d'envoi automatique (flux Power Automate)"), ep),
+    h("p", {class: "mute"}, "Sans URL, le PDF est partagé via l'application mail de l'appareil à la signature.")),
+    [{label: "Fermer", val: false}, {label: "Enregistrer", val: true, cls: "pri"}]);
+  if (r) { settings.endpoint = ep.value.trim(); toast("Réglages enregistrés"); }
+}
+
+/* ============ Vue Formulaire ============ */
+async function openReport(id) {
+  cur = await DB.get(id);
+  ro = cur.status !== "draft";
+  openSecs = new Set([0]);
+  $top.replaceChildren(
+    h("button", {class: "btn ghost sm", onclick: showHome, "aria-label": "Retour"}, "‹ Fiches"),
+    h("h1", {}, "Fiche de maintenance"),
+    h("span", {class: "st", id: "st"}, ro ? "Verrouillée" : "Enregistré ✓"));
+  render();
+}
+function render() {
+  const y = window.scrollY, s = cur;
+  const form = h("div");
+  if (ro) {
+    form.append(h("div", {class: "banner " + (s.status === "sent" ? "ok" : "warn")},
+      s.status === "sent" ? "Fiche signée le " + fmtDT(s.signedAt) + " — envoyée à " + CONFIG.to + " le " + fmtDT(s.sentAt) + "." : "Fiche signée le " + fmtDT(s.signedAt) + " — envoi à " + CONFIG.to + " en attente.",
+      h("div", {class: "bar"},
+        s.status !== "sent" ? h("button", {class: "btn pri sm", onclick: () => resend(s.id)}, "Envoyer maintenant") : null,
+        h("button", {class: "btn sm", onclick: () => downloadPdf(s)}, "Télécharger le PDF"),
+        h("button", {class: "btn sm", onclick: async () => { const n = duplicateOf(s); cur = n; await saveNow(); openReport(n.id); }}, "Dupliquer en nouvelle fiche"))));
+  }
+  const fs = h("fieldset", {disabled: ro});
+  fs.append(secGeneral(), secBatiment(), secComptage(), secAC(), secSecurite(), secSupervision(), secOnduleurs(), secAnnexe(), secFin());
+  form.append(fs);
+  $main.replaceChildren(form);
+  updateCounters();
+  window.scrollTo(0, y);
+  if (pendingFocus) { const e = $main.querySelector(pendingFocus); if (e) e.focus(); pendingFocus = null; }
+}
+const rerender = () => { render(); save(); };
+
+function section(key, title, ...body) {
+  const d = h("details", {class: "sec", open: openSecs.has(key), "data-k": key},
+    h("summary", {}, h("span", {}, title), h("span", {class: "badge", "data-cnt": key})), h("div", {class: "in"}, body));
+  d.addEventListener("toggle", () => { d.open ? openSecs.add(key) : openSecs.delete(key); });
+  return d;
+}
+function updateCounters() {
+  const by = {};
+  collectTables(cur).forEach(t => {
+    const b = by[t.sec] ||= {tot: 0, done: 0, nok: 0};
+    t.items.forEach((_, i) => { b.tot++; const r = t.rows[i]?.r; if (r) b.done++; if (r === "NOK") b.nok++; });
+  });
+  document.querySelectorAll("[data-cnt]").forEach(e => {
+    const b = by[e.dataset.cnt]; if (!b) { e.style.display = "none"; return; }
+    e.textContent = b.done + "/" + b.tot + (b.nok ? " · " + b.nok + " NOK" : "");
+    e.className = "badge " + (b.nok ? "nok" : b.done === b.tot ? "ok" : "");
+  });
+}
+function inp(label, obj, key, o = {}) {
+  const el = o.area ? h("textarea", {rows: 2}) : h("input", {type: o.type || "text", inputmode: o.mode}); el.value = obj[key] ?? "";
+  if (o.ph) el.placeholder = o.ph;
+  el.addEventListener("input", () => { obj[key] = el.value; save(); o.after && o.after(); });
+  return h("label", {class: "f"}, h("span", {}, label), el);
+}
+function checklist(rows, items) {
+  const wrap = h("div", {class: "cl"});
+  wrap.append(h("div", {class: "tools"}, h("button", {class: "btn sm", onclick: () => {
+    items.forEach((_, i) => { (rows[i] ||= {r: "", obs: ""}); if (!rows[i].r) rows[i].r = "OK"; }); rerender();
+  }}, "Tout OK (lignes vides)")));
+  items.forEach(([label, moyen], i) => {
+    const row = rows[i] ||= {r: "", obs: ""};
+    const el = h("div", {class: "row", "data-r": row.r});
+    const ta = h("textarea", {rows: 1, placeholder: row.r === "NOK" ? "Observation obligatoire (NOK)" : "Observation"}); ta.value = row.obs;
+    ta.addEventListener("input", () => { row.obs = ta.value; save(); });
+    const seg = h("div", {class: "seg", role: "group", "aria-label": label});
+    [["OK", "OK"], ["NOK", "NOK"], ["NA", "N/A"]].forEach(([v, t]) => {
+      const b = h("button", {type: "button", "data-v": v, class: row.r === v ? "on" : "", "aria-pressed": row.r === v, onclick: () => {
+        row.r = row.r === v ? "" : v; el.dataset.r = row.r;
+        seg.querySelectorAll("button").forEach(x => { x.classList.toggle("on", x.dataset.v === row.r); x.setAttribute("aria-pressed", x.dataset.v === row.r); });
+        ta.placeholder = row.r === "NOK" ? "Observation obligatoire (NOK)" : "Observation";
+        if (row.r === "NOK") ta.focus();
+        updateCounters(); save();
+      }}, t);
+      seg.append(b);
+    });
+    el.append(h("div", {class: "lbl"}, label, h("small", {}, "Moyen : " + moyen)), seg, ta);
+    wrap.append(el);
+  });
+  return wrap;
+}
+const tableBlock = (title, items, rows) => [h("h3", {}, title), checklist(rows, items)];
+
+function secGeneral() {
+  const g = cur.g;
+  const types = h("div", {class: "chk"}, MAINT_TYPES.map(t => h("label", {}, h("input", {type: "checkbox", checked: g.types.includes(t), onchange: e => {
+    g.types = e.target.checked ? [...g.types, t] : g.types.filter(x => x !== t); save(); rerender();
+  }}), t)));
+  return section(0, "Informations générales",
+    h("div", {class: "grid"},
+      inp("Client / Maître de l'ouvrage", g, "client", {after: () => {}}), inp("Référence projet / contrat", g, "projet"),
+      inp("Désignation de l'installation (puissance kWc)", g, "designation"), inp("Adresse du site", g, "adresse"),
+      inp("Date de mise en service", g, "miseService", {type: "date"}), inp("Date de la visite", g, "dateVisite", {type: "date"}),
+      inp("N° d'intervention / BT", g, "intervention"), inp("Société intervenante", g, "societe"),
+      inp("Technicien(s)", g, "technicien", {after: () => { settings.tech = g.technicien; }}),
+      inp("Météo à l'arrivée", g, "meteo"), inp("Température à l'arrivée", g, "temperature")),
+    h("h3", {}, "Type de maintenance"), types,
+    g.types.includes("Autre") ? h("div", {style: "margin-top:8px"}, inp("Autre : préciser", g, "typeAutre")) : null);
+}
+function secBatiment() {
+  const T = k => tbl(cur, k);
+  return section(1, SECTIONS[1],
+    inp("Commentaires généraux", cur, "comBat", {area: true}),
+    tableBlock("Bâtiment / structure porteuse", ITEMS.batiment, T("batiment")),
+    tableBlock("Local technique", ITEMS.local, T("local")),
+    h("h3", {}, "Toiture"), inp("Moyen d'accès en toiture", cur, "accesToiture"), checklist(T("toiture"), ITEMS.toiture),
+    h("h3", {}, "Relevé photographique des anomalies constatées (illimité)"), photoBlock());
+}
+function secComptage() {
+  return section(2, SECTIONS[2],
+    tableBlock("Coffret de comptage", ITEMS.comptage, tbl(cur, "comptage")),
+    h("h3", {}, "Relevés de comptage"),
+    h("div", {class: "grid"}, inp("Relevé index Production P- (kWh)", cur.index, "prod", {mode: "decimal"}), inp("Relevé index Consommation P+ (kWh)", cur.index, "conso", {mode: "decimal"})),
+    h("h3", {}, "Poste de livraison HTA / Tarif jaune-vert"),
+    h("div", {class: "chk"}, h("label", {}, h("input", {type: "checkbox", checked: cur.htaApplicable, onchange: e => { cur.htaApplicable = e.target.checked; rerender(); }}), "Applicable sur ce site")),
+    cur.htaApplicable ? checklist(tbl(cur, "hta"), ITEMS.hta) : null);
+}
+function repeatable(list, labelOne, items, addLabel) {
+  const out = [];
+  list.forEach((d, i) => out.push(h("div", {class: "card"},
+    h("div", {class: "bar", style: "align-items:end"}, h("div", {style: "flex:1"}, inp(labelOne + " " + (i + 1) + " — repère / nom", d, "name")),
+      h("button", {class: "btn sm danger", onclick: async () => { if (await ask("Supprimer ?", labelOne + " " + (i + 1) + " et ses contrôles seront supprimés.")) { list.splice(i, 1); rerender(); } }}, "Supprimer")),
+    checklist(d.rows, items))));
+  out.push(h("button", {class: "btn", onclick: () => { list.push({id: uid(), name: "", rows: {}}); rerender(); }}, "＋ " + addLabel));
+  return out;
+}
+function secAC() {
+  return section(3, SECTIONS[3], tableBlock("Tableau Général Basse Tension (TGBT)", ITEMS.tgbt, tbl(cur, "tgbt")),
+    h("h3", {}, "Tableau(x) divisionnaire(s)"), repeatable(cur.divis, "Tableau divisionnaire", ITEMS.divis, "Ajouter un tableau divisionnaire"));
+}
+function secSecurite() { return section(4, SECTIONS[4], checklist(tbl(cur, "securite"), ITEMS.securite)); }
+function secSupervision() {
+  return section(5, SECTIONS[5],
+    h("div", {class: "grid"}, inp("Marque", cur.sup, "marque"), inp("Modèle", cur.sup, "modele")),
+    inp("Commentaires (routeur, dongle, matériel complémentaire...)", cur.sup, "commentaires", {area: true}),
+    tableBlock("Coffret de supervision", ITEMS.supcoffret, tbl(cur, "supcoffret")),
+    tableBlock("État du matériel", ITEMS.supmat, tbl(cur, "supmat")));
+}
+function secOnduleurs() {
+  const cards = cur.inverters.map((o, i) => h("div", {class: "card"},
+    h("div", {class: "bar", style: "justify-content:space-between;align-items:center"}, h("b", {}, "Onduleur n° " + (i + 1)),
+      cur.inverters.length > 1 ? h("button", {class: "btn sm danger", onclick: async () => { if (await ask("Supprimer l'onduleur n° " + (i + 1) + " ?", "Ses contrôles et ses strings seront supprimés.")) { cur.inverters.splice(i, 1); rerender(); } }}, "Supprimer") : null),
+    h("div", {class: "grid"}, inp("Marque", o, "marque"), inp("Modèle", o, "modele"), inp("N° de série", o, "serie")),
+    h("details", {open: Object.values(o.rows).some(r => r.r), style: "margin-top:8px"}, h("summary", {class: "btn sm", style: "display:inline-block"}, "Contrôles de l'onduleur"), checklist(o.rows, ITEMS.onduleur))));
+  return section(6, SECTIONS[6],
+    inp("Commentaires généraux", cur, "comOnd", {area: true}),
+    h("h3", {}, "Listing des onduleurs et contrôles"), cards,
+    h("button", {class: "btn", onclick: () => { cur.inverters.push(newInverter()); rerender(); }}, "＋ Ajouter un onduleur"),
+    h("h3", {}, "Coffret(s) DC"), repeatable(cur.dcs, "Coffret DC", ITEMS.dc, "Ajouter un coffret DC"));
+}
+function secAnnexe() {
+  const cards = cur.inverters.map((o, i) => {
+    const addStrings = n => { let next = o.strings.reduce((m, x) => Math.max(m, parseInt(x.n) || 0), 0); for (let k = 0; k < n; k++) o.strings.push({id: uid(), n: String(++next), i: "", v: "", obs: ""}); pendingFocus = "[data-sid='" + o.strings.at(-1).id + "'] input"; rerender(); };
+    return h("div", {class: "card"},
+      h("b", {}, "Onduleur n° " + (i + 1) + (o.marque || o.modele ? " — " + [o.marque, o.modele].filter(Boolean).join(" ") : "")),
+      h("div", {class: "grid", style: "margin-top:8px"},
+        inp("Tension MPPT (V)", o, "mppt", {mode: "decimal"}), inp("Puissance (kW)", o, "puissance", {mode: "decimal"}),
+        inp("R iso V+/T", o, "risoP", {mode: "decimal"}), inp("R iso V-/T", o, "risoM", {mode: "decimal"})),
+      h("h3", {}, "Strings (" + o.strings.length + ")"),
+      o.strings.length ? h("div", {class: "strings"}, h("div", {class: "hd"}, h("span", {}, "String n°"), h("span", {}, "Intensité (A)"), h("span", {}, "Tension (V)"), h("span")),
+        o.strings.map((x, j) => h("div", {class: "s", "data-sid": x.id},
+          h("input", {type: "text", value: x.n, "aria-label": "N° string", oninput: e => { x.n = e.target.value; save(); }}),
+          h("input", {type: "text", inputmode: "decimal", value: x.i, "aria-label": "Intensité", oninput: e => { x.i = e.target.value; save(); }}),
+          h("input", {type: "text", inputmode: "decimal", value: x.v, "aria-label": "Tension", oninput: e => { x.v = e.target.value; save(); }}),
+          h("button", {class: "btn sm danger", "aria-label": "Supprimer le string", onclick: () => { o.strings.splice(j, 1); rerender(); }}, "✕"),
+          h("input", {type: "text", class: "o", placeholder: "Observation", value: x.obs, oninput: e => { x.obs = e.target.value; save(); }})))) : h("div", {class: "mute"}, "Aucun string saisi."),
+      h("div", {class: "bar"}, [1, 5, 10].map(n => h("button", {class: "btn sm", onclick: () => addStrings(n)}, "＋ " + n + " string" + (n > 1 ? "s" : "")))));
+  });
+  return section(7, "7. Annexe : relevé de mesures", h("h3", {}, "Caractéristiques onduleurs et mesures par string"), cards);
+}
+function secFin() {
+  const synthCards = cur.synth.map((x, i) => h("div", {class: "synth"},
+    h("div", {class: "bar", style: "justify-content:space-between;align-items:center;margin:0"}, h("b", {}, "N° " + (i + 1)), h("button", {class: "btn sm danger", onclick: () => { cur.synth.splice(i, 1); rerender(); }}, "Supprimer")),
+    inp("Localisation / Équipement", x, "loc"), inp("Description de l'anomalie", x, "desc", {area: true}),
+    h("label", {class: "f"}, h("span", {}, "Criticité"), (() => { const s = h("select", {}, CRITS.map(c => h("option", {value: c}, c))); s.value = x.crit; s.addEventListener("change", () => { x.crit = s.value; save(); }); return s; })()),
+    inp("Action corrective proposée", x, "action", {area: true})));
+  return section(8, SECTIONS[8],
+    h("h3", {}, "Synthèse des non-conformités et remarques (illimitée)"), synthCards,
+    h("div", {class: "bar"},
+      h("button", {class: "btn", onclick: () => { cur.synth.push({loc: "", desc: "", crit: CRITS[0], action: ""}); pendingFocus = ".synth:last-of-type input"; rerender(); }}, "＋ Ajouter une ligne"),
+      h("button", {class: "btn", onclick: importNok}, "Importer les NOK")),
+    h("p", {class: "mute"}, "« Importer les NOK » crée une ligne pour chaque contrôle NOK pas encore repris."),
+    h("h3", {}, "Vérifications de fin d'intervention"), checklist(tbl(cur, "fin"), ITEMS.fin),
+    h("div", {class: "grid", style: "margin-top:10px"}, inp("Date de fin d'intervention", cur.fin, "date", {type: "date"}), inp("Météo en fin d'intervention", cur.fin, "meteo")),
+    h("h3", {}, "Signatures"),
+    h("p", {class: "mute"}, "Le signataire client reconnaît avoir reçu une explication du présent rapport."),
+    h("div", {class: "grid"}, sigPad("Technicien : " + (cur.g.technicien || "—"), "tech"),
+      h("div", {}, inp("Nom du client / représentant", cur, "clientName"), h("div", {style: "height:8px"}), sigPad("Client ou représentant du client", "client"))),
+    ro ? null : h("div", {class: "bar", style: "margin-top:16px"}, h("button", {class: "btn pri", style: "flex:1", onclick: signAndSend}, "✍ Signer et envoyer à " + CONFIG.to)));
+}
+function importNok() {
+  const known = new Set(cur.synth.map(x => x.src).filter(Boolean)); let n = 0;
+  collectTables(cur).forEach(t => t.items.forEach(([label], i) => {
+    const r = t.rows[i]; if (r?.r !== "NOK") return;
+    const src = t.key + ":" + i; if (known.has(src)) return;
+    cur.synth.push({src, loc: t.title, desc: label + (r.obs ? " — " + r.obs : ""), crit: CRITS[0], action: ""}); n++;
+  }));
+  toast(n ? n + " ligne(s) ajoutée(s)" : "Aucun nouveau NOK à importer"); if (n) rerender();
+}
+
+/* ---- Signature ---- */
+function sigPad(label, who) {
+  const c = h("canvas", {class: "sig" + (cur.sig[who] ? " done" : ""), width: 600, height: 220, "aria-label": "Zone de signature : " + label});
+  const g = c.getContext("2d"); g.lineWidth = 3; g.lineCap = g.lineJoin = "round"; g.strokeStyle = "#111";
+  if (cur.sig[who]) { const im = new Image(); im.onload = () => g.drawImage(im, 0, 0, 600, 220); im.src = cur.sig[who]; }
+  const pos = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * 600 / r.width, (e.clientY - r.top) * 220 / r.height]; };
+  let drawing = false;
+  c.addEventListener("pointerdown", e => { if (ro) return; drawing = true; c.setPointerCapture(e.pointerId); const [x, y] = pos(e); g.beginPath(); g.moveTo(x, y); g.lineTo(x + .1, y + .1); g.stroke(); e.preventDefault(); });
+  c.addEventListener("pointermove", e => { if (!drawing) return; const [x, y] = pos(e); g.lineTo(x, y); g.stroke(); e.preventDefault(); });
+  const end = () => { if (!drawing) return; drawing = false; cur.sig[who] = c.toDataURL("image/png"); c.classList.add("done"); save(); };
+  c.addEventListener("pointerup", end); c.addEventListener("pointercancel", end);
+  return h("div", {}, h("div", {class: "mute"}, label), c,
+    ro ? null : h("button", {class: "btn sm", style: "margin-top:6px", onclick: () => { g.clearRect(0, 0, 600, 220); cur.sig[who] = ""; c.classList.remove("done"); save(); }}, "Effacer"));
+}
+
+/* ---- Photos (illimitées, compressées) ---- */
+function photoBlock() {
+  const addFiles = async files => {
+    const list = [...files]; if (!list.length) return;
+    toast("Traitement de " + list.length + " photo(s)…");
+    for (const f of list) { try { cur.photos.push({id: uid(), desc: "", ...(await shrink(f))}); } catch (e) { console.error(e); } }
+    rerender();
+  };
+  const cam = h("input", {type: "file", accept: "image/*", capture: "environment", hidden: true, onchange: e => addFiles(e.target.files)});
+  const gal = h("input", {type: "file", accept: "image/*", multiple: true, hidden: true, onchange: e => addFiles(e.target.files)});
+  return h("div", {},
+    h("div", {class: "bar"}, cam, gal, h("button", {class: "btn pri", onclick: () => cam.click()}, "📷 Prendre une photo"), h("button", {class: "btn", onclick: () => gal.click()}, "🖼 Ajouter depuis la galerie")),
+    cur.photos.length ? h("div", {class: "photos"}, cur.photos.map((p, i) => h("div", {class: "photo"}, h("img", {src: p.img, alt: "Photo " + (i + 1)}),
+      h("div", {class: "b"}, h("input", {type: "text", placeholder: "Description / repérage (string, module colonne-ligne…)", value: p.desc, oninput: e => { p.desc = e.target.value; save(); }}),
+        h("button", {class: "btn sm danger", onclick: () => { cur.photos.splice(i, 1); rerender(); }}, "Supprimer"))))) : h("div", {class: "mute"}, "Aucune photo (" + cur.photos.length + ")."),
+    cur.photos.length ? h("div", {class: "mute", style: "margin-top:6px"}, cur.photos.length + " photo(s)") : null);
+}
+function shrink(file, max = 1280, q = .72) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, max / Math.max(im.width, im.height)), w = Math.round(im.width * k), hh = Math.round(im.height * k);
+      const c = document.createElement("canvas"); c.width = w; c.height = hh; c.getContext("2d").drawImage(im, 0, 0, w, hh);
+      URL.revokeObjectURL(url); res({img: c.toDataURL("image/jpeg", q), w, h: hh});
+    };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error("image")); };
+    im.src = url;
+  });
+}
+
+/* ============ Validation, signature, envoi ============ */
+function validate(s) {
+  const e = [];
+  if (!s.g.client.trim()) e.push("Client / Maître de l'ouvrage non renseigné");
+  if (!s.g.adresse.trim()) e.push("Adresse du site non renseignée");
+  if (!s.g.dateVisite) e.push("Date de la visite non renseignée");
+  if (!s.g.technicien.trim()) e.push("Nom du technicien non renseigné");
+  collectTables(s).forEach(t => t.items.forEach(([l], i) => {
+    const r = t.rows[i]; if (r?.r === "NOK" && !r.obs.trim()) e.push("NOK sans observation — " + t.title + " : " + l.split(" — ")[0]);
+  }));
+  if (!s.sig.tech) e.push("Signature du technicien manquante");
+  return e;
+}
+async function signAndSend() {
+  const errs = validate(cur);
+  if (errs.length) { await modal("À compléter avant signature", h("ul", {}, errs.slice(0, 12).map(x => h("li", {}, x)), errs.length > 12 ? h("li", {}, "… et " + (errs.length - 12) + " autre(s)") : null), [{label: "Compris", val: true, cls: "pri"}]); return; }
+  const empty = collectTables(cur).reduce((n, t) => n + t.items.filter((_, i) => !t.rows[i]?.r).length, 0);
+  if (empty && !await ask("Contrôles sans résultat", empty + " contrôle(s) n'ont pas de résultat (OK / NOK / N/A). Signer quand même ?")) return;
+  if (!cur.fin.date) cur.fin.date = today();
+  cur.signedAt = new Date().toISOString(); cur.status = "pending"; ro = true;
+  await saveNow();
+  await deliver(cur);
+  openReport(cur.id);
+}
+async function resend(id) { const s = await DB.get(id); cur = s; await deliver(s); if (document.getElementById("st")) openReport(id); else showHome(); }
+function b64(blob) { return new Promise((r, j) => { const f = new FileReader(); f.onload = () => r(f.result.split(",")[1]); f.onerror = j; f.readAsDataURL(blob); }); }
+async function deliver(s) {
+  let built;
+  try { built = buildPdf(s); } catch (e) { console.error(e); toast("Génération du PDF impossible (bibliothèque non chargée ? connexion requise au 1er lancement)."); return; }
+  const ep = settings.endpoint;
+  const subject = "Fiche de maintenance PV — " + (s.g.client || "client") + " — " + fmtDate(s.g.dateVisite);
+  const text = "Fiche de contrôle de maintenance signée.\nClient : " + s.g.client + "\nSite : " + s.g.adresse + "\nDate : " + fmtDate(s.g.dateVisite) + "\nTechnicien : " + s.g.technicien;
+  if (ep) {
+    toast("Envoi en cours…", 8000);
+    try {
+      const res = await fetch(ep, {method: "POST", headers: {"Content-Type": "text/plain;charset=UTF-8"}, body: JSON.stringify({to: CONFIG.to, subject, body: text, filename: built.name, pdfBase64: await b64(built.blob),
+        report: {id: s.id, client: s.g.client, site: s.g.adresse, date: s.g.dateVisite, technicien: s.g.technicien, nok: metaOf(s).nok}})});
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      s.status = "sent"; s.sentAt = new Date().toISOString(); await DB.put(s); toast("✓ Fiche envoyée à " + CONFIG.to); return;
+    } catch (e) { console.error(e); toast("Envoi impossible (" + (e.message || "réseau") + "). La fiche reste « à envoyer » : bouton Renvoyer."); return; }
+  }
+  const file = new File([built.blob], built.name, {type: "application/pdf"});
+  const choice = await modal("Envoi par mail", h("p", {}, "Aucune URL d'envoi automatique n'est configurée. Le PDF va être joint à un mail pour " + CONFIG.to + "."),
+    [{label: "Plus tard", val: "later"}, {label: "Télécharger le PDF", val: "dl"}, {label: "Envoyer par mail", val: "share", cls: "pri"}]);
+  if (choice === "share") {
+    try {
+      if (navigator.canShare && navigator.canShare({files: [file]})) { await navigator.share({files: [file], title: subject, text: "Destinataire : " + CONFIG.to + "\n\n" + text}); s.status = "sent"; s.sentAt = new Date().toISOString(); await DB.put(s); return; }
+    } catch (e) { if (e.name === "AbortError") return; }
+    saveBlob(built.blob, built.name); location.href = "mailto:" + CONFIG.to + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(text + "\n\n(Joindre le PDF téléchargé)");
+  } else if (choice === "dl") saveBlob(built.blob, built.name);
+}
+function saveBlob(blob, name) { const a = h("a", {href: URL.createObjectURL(blob), download: name}); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+function downloadPdf(s) { try { const b = buildPdf(s); saveBlob(b.blob, b.name); } catch (e) { console.error(e); toast("Génération du PDF impossible."); } }
+
+/* ============ PDF ============ */
+function buildPdf(s) {
+  const {jsPDF} = window.jspdf; const doc = new jsPDF({unit: "mm", format: "a4"});
+  const san = t => String(t ?? "").replace(/[—–]/g, "-").replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/…/g, "...").replace(/[^\x00-\xFF]/g, "?");
+  const M = 12, PW = 210, PH = 297, NAVY = [11, 79, 138];
+  let y = 18;
+  const need = n => { if (y + n > PH - 16) { doc.addPage(); y = 16; } };
+  const H1 = t => { need(14); doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...NAVY); doc.text(san(t), M, y); y += 6; doc.setTextColor(0); };
+  const H2 = t => { need(12); doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(60); doc.text(san(t), M, y); y += 3; doc.setTextColor(0); };
+  const P = t => { if (!String(t || "").trim()) return; doc.setFont("helvetica", "normal"); doc.setFontSize(9); const l = doc.splitTextToSize(san(t), PW - 2 * M); need(l.length * 4 + 2); doc.text(l, M, y + 3); y += l.length * 4 + 3; };
+  const T = (head, body, o = {}) => { doc.autoTable({startY: y, head: [head.map(san)], body: body.map(r => r.map(san)), margin: {left: M, right: M, bottom: 16}, theme: "grid", styles: {fontSize: 8, cellPadding: 1.5, lineColor: [200, 205, 212], lineWidth: .2, overflow: "linebreak"}, headStyles: {fillColor: NAVY, textColor: 255}, ...o}); y = doc.lastAutoTable.finalY + 5; };
+  const CK = (title, items, rows) => {
+    H2(title);
+    T(["Contrôle", "Moyen", "Résultat", "Observations"], items.map(([l, m], i) => [l, m, ({OK: "OK", NOK: "NOK", NA: "N/A"})[rows[i]?.r] || "-", rows[i]?.obs || ""]),
+      {columnStyles: {0: {cellWidth: 72}, 1: {cellWidth: 16}, 2: {cellWidth: 16, halign: "center", fontStyle: "bold"}},
+       didParseCell: d => { if (d.section === "body" && d.column.index === 2) { if (d.cell.raw === "OK") d.cell.styles.textColor = [27, 127, 59]; if (d.cell.raw === "NOK") { d.cell.styles.textColor = [198, 40, 40]; d.row.cells[3].styles.fillColor = [253, 234, 234]; } } }});
+  };
+  const g = s.g;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(...NAVY); doc.text("FICHE DE CONTRÔLE DE MAINTENANCE", PW / 2, y, {align: "center"});
+  doc.setFontSize(12); doc.text("CENTRALE PHOTOVOLTAÏQUE", PW / 2, y + 6, {align: "center"}); doc.setTextColor(0); y += 14;
+  H1("Informations générales");
+  const types = g.types.map(t => t === "Autre" && g.typeAutre ? "Autre : " + g.typeAutre : t).join(", ");
+  T(["Champ", "Valeur", "Champ", "Valeur"], [
+    ["Client / Maître de l'ouvrage", g.client, "Référence projet / contrat", g.projet],
+    ["Installation (kWc)", g.designation, "Adresse du site", g.adresse],
+    ["Mise en service", fmtDate(g.miseService), "Date de la visite", fmtDate(g.dateVisite)],
+    ["Type de maintenance", types, "N° d'intervention / BT", g.intervention],
+    ["Société intervenante", g.societe, "Technicien(s)", g.technicien],
+    ["Météo à l'arrivée", g.meteo, "Température à l'arrivée", g.temperature]],
+    {columnStyles: {0: {fontStyle: "bold", cellWidth: 36}, 2: {fontStyle: "bold", cellWidth: 36}}});
+  const tb = k => tbl(s, k);
+  H1(SECTIONS[1]); P(s.comBat);
+  CK("Bâtiment / structure porteuse", ITEMS.batiment, tb("batiment")); CK("Local technique", ITEMS.local, tb("local"));
+  P("Moyen d'accès en toiture : " + (s.accesToiture || "-")); CK("Toiture", ITEMS.toiture, tb("toiture"));
+  H1(SECTIONS[2]); CK("Coffret de comptage", ITEMS.comptage, tb("comptage"));
+  H2("Relevés de comptage"); T(["Désignation", "Valeur relevée (kWh)"], [["Index Production P- (kWh)", s.index.prod], ["Index Consommation P+ (kWh)", s.index.conso]]);
+  if (s.htaApplicable) CK("Poste de livraison HTA / Tarif jaune-vert", ITEMS.hta, tb("hta"));
+  H1(SECTIONS[3]); CK("Tableau Général Basse Tension (TGBT)", ITEMS.tgbt, tb("tgbt"));
+  s.divis.forEach((d, i) => CK("Tableau divisionnaire " + (d.name || i + 1), ITEMS.divis, d.rows));
+  H1(SECTIONS[4]); CK("Contrôles", ITEMS.securite, tb("securite"));
+  H1(SECTIONS[5]); T(["Marque", "Modèle"], [[s.sup.marque, s.sup.modele]]); P(s.sup.commentaires);
+  CK("Coffret de supervision", ITEMS.supcoffret, tb("supcoffret")); CK("État du matériel", ITEMS.supmat, tb("supmat"));
+  H1(SECTIONS[6]); P(s.comOnd);
+  T(["Onduleur n°", "Marque", "Modèle", "N° de série"], s.inverters.map((o, i) => [i + 1, o.marque, o.modele, o.serie]));
+  s.inverters.forEach((o, i) => CK("Onduleur n° " + (i + 1) + (o.marque ? " - " + o.marque + " " + o.modele : ""), ITEMS.onduleur, o.rows));
+  s.dcs.forEach((d, i) => CK("Coffret DC " + (d.name || i + 1), ITEMS.dc, d.rows));
+  H1("7. Annexe : relevé de mesures");
+  T(["Ond.", "Marque", "Modèle", "N° Série", "Nbre String", "Tension MPPT (V)", "Puissance (kW)", "R iso V+/T", "R iso V-/T"], s.inverters.map((o, i) => [i + 1, o.marque, o.modele, o.serie, o.strings.length, o.mppt, o.puissance, o.risoP, o.risoM]));
+  H2("Mesures des intensités et tensions par string");
+  const srows = []; s.inverters.forEach((o, i) => o.strings.forEach(x => srows.push([i + 1, x.n, x.i, x.v, x.obs])));
+  T(["Onduleur n°", "String n°", "Intensité (A)", "Tension (V)", "Observations"], srows.length ? srows : [["", "", "", "", ""]]);
+  H1(SECTIONS[8]); H2("Synthèse des non-conformités et remarques");
+  T(["N°", "Localisation / Équipement", "Description de l'anomalie", "Criticité", "Action corrective proposée"], s.synth.length ? s.synth.map((x, i) => [i + 1, x.loc, x.desc, x.crit, x.action]) : [["", "Aucune", "", "", ""]], {columnStyles: {0: {cellWidth: 8}}});
+  CK("Vérifications de fin d'intervention", ITEMS.fin, tb("fin"));
+  P("Date de fin d'intervention : " + fmtDate(s.fin.date) + "     Météo en fin d'intervention : " + (s.fin.meteo || "-"));
+  // Signatures
+  need(60); H1("Signatures"); P("* Le signataire reconnaît avoir reçu une explication du présent rapport.");
+  const sy = y + 2, bw = (PW - 2 * M - 8) / 2;
+  [["Technicien : " + g.technicien, s.sig.tech], ["Client ou représentant du client : " + (s.clientName || ""), s.sig.client]].forEach(([lab, img], k) => {
+    const x = M + k * (bw + 8); doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.text(san(lab), x, sy + 3); doc.setDrawColor(180); doc.rect(x, sy + 5, bw, 34);
+    if (img) doc.addImage(img, "PNG", x + 1, sy + 6, bw - 2, (bw - 2) * 220 / 600 > 32 ? 32 : (bw - 2) * 220 / 600);
+  });
+  doc.setFont("helvetica", "normal"); doc.text("Signé le " + fmtDT(s.signedAt), M, sy + 44); y = sy + 48;
+  // Photos
+  if (s.photos.length) {
+    doc.addPage(); y = 16; H1("Relevé photographique des anomalies constatées (" + s.photos.length + ")");
+    const bw2 = (PW - 2 * M - 6) / 2, bh = 70;
+    s.photos.forEach((p, i) => {
+      const col = i % 2; if (col === 0 && i > 0) y += bh + 14; if (col === 0) need(bh + 14);
+      if (y + bh + 14 > PH - 16 && col === 0) { doc.addPage(); y = 16; }
+      const x = M + col * (bw2 + 6), k = Math.min(bw2 / p.w, bh / p.h), w = p.w * k, hh = p.h * k;
+      doc.addImage(p.img, "JPEG", x, y, w, hh); doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+      doc.text(doc.splitTextToSize(san("Photo " + (i + 1) + (p.desc ? " - " + p.desc : "")), bw2), x, y + bh + 4);
+    });
+  }
+  const n = doc.getNumberOfPages();
+  for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(110);
+    doc.text(san("Référence : FO E&M 004 Version : 2"), M, 8); doc.text(san("Circet Energy - Fiche de contrôle de maintenance - Centrale photovoltaïque - " + (g.client || "")), M, PH - 8); doc.text("Page " + i + " / " + n, PW - M, PH - 8, {align: "right"}); }
+  const name = ("Maintenance_PV_" + (g.client || "site") + "_" + (g.dateVisite || today())).replace(/[^\w\-]+/g, "_") + ".pdf";
+  return {blob: doc.output("blob"), name};
+}
+
+/* ============ Démarrage ============ */
+window.addEventListener("beforeunload", () => { if (cur && saveTimer) saveNow(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden && cur && saveTimer) saveNow(); });
+showHome();
+</script>
+</body>
+</html>
