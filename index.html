@@ -75,6 +75,10 @@ fieldset{border:0;padding:0;margin:0;min-width:0}
 .hist .a{display:flex;gap:6px;flex-wrap:wrap}
 .tr{overflow-x:auto}
 .synth{border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;display:grid;gap:8px}
+.pick{border:1px solid var(--line);border-radius:10px;background:#fff;margin-top:4px;overflow:hidden}
+.pick button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:#fff;min-height:44px;padding:8px 12px}
+.pick button:last-child{border-bottom:0}
+.pick small{display:block;color:var(--mute);font-size:12px}
 dialog{border:0;border-radius:14px;max-width:min(560px,calc(100vw - 32px));width:100%;padding:16px}
 dialog::backdrop{background:rgba(0,0,0,.45)}
 dialog h2{margin:0 0 8px;font-size:18px}
@@ -98,13 +102,15 @@ const CONFIG = {
   // URL du flux Power Automate (déclencheur « Requête HTTP ») ou de tout service acceptant le POST JSON.
   // Peut aussi être saisie dans ⚙ Réglages sur l'appareil.
   endpoint: "",
-  ref: "FO E&M 004 v2"
+  ref: "FO E&M 004 v2",
+  ppDonneur: "KBE Energy", // nom repris du formulaire MoreApp « Plan de prévention - Maintenance », art. 3
+  loginRequired: true // identifiant + mot de passe (comptes dans acces.json) ; ignoré en local (file://, localhost)
 };
 
 /* ============ Référentiel (issu du Word) ============ */
 const V = "Visuel";
 const I = (...a) => a.map(l => [l, V]);
-const ITEMS = {
+const DEF_ITEMS = {
   batiment: I("Modalités d'accès — préciser si problématique pour accéder à la centrale","Etat général de la structure — dégradation, corrosion, tenue mécanique","Test de continuité de la mise à la terre"),
   local: I("Etat général de la structure — dégradation, corrosion, tenue mécanique","Contrôle de l'étanchéité","Etat des portes et de la serrurerie","Etat des grilles de ventilation","Test de continuité de la mise à la terre","Contrôle du bouton d'arrêt d'urgence","Contrôle des étiquettes signalétiques","Nettoyage du local"),
   toiture: I("Présence d'ombres portées en toiture — depuis le sol si visite préventive niv.1 (VP1)","Etat général de la toiture — depuis le sol si VP1","Contrôle de l'étanchéité, absence de fuites et d'oxydation — depuis le sol si VP1","Etat de propreté en toiture — feuilles mortes, fientes, autres déchets","Enlèvement des corps étrangers dans les noues","Etat des capteurs — préciser le nombre de pyranomètres, sondes...","Etat des systèmes de fixation — dégradation, corrosion, tenue mécanique","Contrôle par échantillonnage de la fixation des modules sur tout le contour + ¼ du reste","Absence de tache, points chauds, délamination, fissures du verre et des cellules PV","Contrôle des câbles et chemins de câbles DC — chocs, fixation, traces de chauffe, rouille","Etat de la connectique","Contrôle des étiquettes signalétiques des câblages"),
@@ -119,9 +125,111 @@ const ITEMS = {
   dc: I("Etat général de la structure — dégradation, corrosion, tenue mécanique, traces","Contrôle de l'étanchéité","Contrôle visuel du jeu de barres / des borniers — couleur, déformation","Contrôle des connexions électriques — indiquer la valeur en cas de resserrage au couple","Thermographie — général, connecteurs, câbles","Test de continuité de la mise à la terre","Contrôle des protections — portes fusibles, fusibles, inter-sectionneur","Contrôle des étiquettes signalétiques","Nettoyage externe et dépoussiérage des composants internes"),
   fin: I("Vérifier le fonctionnement de tous les onduleurs et de la supervision","Vérifier la fermeture de tous les coffrets, armoires et locaux techniques","Vérifier la fermeture du site (portail, clôture, crinoline)")
 };
-const SECTIONS = {1:"1. Bâtiment, local technique et toiture",2:"2. Système de comptage",3:"3. Armoires AC",4:"4. Équipements de sécurité",5:"5. Système de supervision",6:"6. Onduleur(s) et coffret(s) DC",8:"8. Fin d'intervention"};
+const DEF_SECTIONS = {1:"1. Bâtiment, local technique et toiture",2:"2. Système de comptage",3:"3. Armoires AC",4:"4. Équipements de sécurité",5:"5. Système de supervision",6:"6. Onduleur(s) et coffret(s) DC",8:"8. Fin d'intervention"};
+
+/* ============ Formulaire modifiable ============
+   Ordre de priorité : modification locale (⚙ Réglages) > fichier formulaire.json à côté de la page > valeurs ci-dessus.
+   Chaque fiche garde une copie du formulaire utilisé à sa création (s.form) : modifier le formulaire
+   n'altère ni les fiches en cours ni les fiches signées. */
+let ITEMS = DEF_ITEMS, SECTIONS = DEF_SECTIONS;
+const FORM_GROUPS = [
+  ["batiment", "1 · Bâtiment / structure porteuse"], ["local", "1 · Local technique"], ["toiture", "1 · Toiture"],
+  ["comptage", "2 · Coffret de comptage"], ["hta", "2 · Poste de livraison HTA"],
+  ["tgbt", "3 · TGBT"], ["divis", "3 · Tableau divisionnaire"],
+  ["securite", "4 · Équipements de sécurité"],
+  ["supcoffret", "5 · Coffret de supervision"], ["supmat", "5 · Matériel de supervision"],
+  ["onduleur", "6 · Onduleur"], ["dc", "6 · Coffret DC"],
+  ["fin", "8 · Vérifications de fin d'intervention"]
+];
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+// Contrôle de structure : renvoie un formulaire propre {items, sections} ou null
+function cleanForm(f) {
+  if (!f || typeof f !== "object" || !f.items) return null;
+  const items = {}, sections = {...DEF_SECTIONS};
+  for (const [k] of FORM_GROUPS) {
+    const a = f.items[k];
+    if (!Array.isArray(a)) { items[k] = DEF_ITEMS[k]; continue; }
+    items[k] = a.map(x => Array.isArray(x) ? [String(x[0] || "").trim(), String(x[1] || "Visuel").trim() || "Visuel"] : String(x || "").split("|").map(p => p.trim())).map(x => [x[0], x.slice(1).join(" | ").trim() || "Visuel"]).filter(x => x[0]);
+  }
+  for (const k of Object.keys(DEF_SECTIONS)) if (f.sections && typeof f.sections[k] === "string" && f.sections[k].trim()) sections[k] = f.sections[k].trim();
+  return {items, sections};
+}
+const defaultForm = () => ({items: DEF_ITEMS, sections: DEF_SECTIONS});
+const activeForm = () => cleanForm(lsGet("pv.form")) || cleanForm(lsGet("pv.formRemote")) || defaultForm();
+// Applique le formulaire d'une fiche (ou celui d'origine pour les fiches antérieures à cette fonction)
+function useForm(s) { const f = s && s.form ? cleanForm(s.form) : null; ITEMS = f ? f.items : DEF_ITEMS; SECTIONS = f ? f.sections : DEF_SECTIONS; }
+// Récupère formulaire.json publié à côté de la page (ignoré hors ligne ou s'il est absent)
+async function refreshRemoteForm() {
+  try {
+    const r = await fetch("formulaire.json", {cache: "no-cache"});
+    if (!r.ok) return;
+    const f = cleanForm(await r.json());
+    if (f) lsSet("pv.formRemote", f);
+  } catch {}
+}
 const MAINT_TYPES = ["Préventive","Curative","Annuelle","Autre"];
 const CRITS = ["Non-conformité / critique","Remarque non critique"];
+
+/* ============ Plan de prévention (document distinct, imprimé dans le même PDF) ============ */
+const PP_RISKS = ["Exposition aux rayonnements ionisants ou à l’amiante ou au plomb ou à des substances et préparations dangereuses", "Risque biologique", "Risque de chute de hauteur", "Risque lié à des travaux exposant à un niveau d’exposition sonore quotidienne supérieure à 85 dB ou à une pression acoustique de crête supérieure à 135 dB", "Risque électrique", "Risque de noyade", "Risque lié au milieu hyperbare", "Risque lié à des travaux comportant le recours à des appareils de levage, installés au-dessus d’une zone de travail ou de circulation", "Risque lié à des travaux de maintenance sur des installations à très haute ou très basse température", "Risque d’ensevelissement", "Risque lié à la circulation interne de véhicule", "Risque lié à des travaux d’installation ou de maintenance sur les équipements de travail", "Risque lié à des travaux de montage, démontage d’éléments préfabriqués lourds"];
+const PP_CONSIGNES = [["c1", "Consignes de sécurité en vigueur dans l’EU, à l’occasion du travail ou du déplacement"], ["c2", "Consignes relatives à l’organisation des secours en cas d’urgence"], ["c3", "Plans des voies de circulation, lieux d'intervention, locaux"], ["c4", "Procédures relatives aux permis de feux et permis spéciaux"], ["c5", "Procédures d’utilisation des appareils de levage et équipements mobiles"], ["c6", "Consignes relatives à l’évacuation des déchets"]];
+const PP_SIGN = [["mo", "Maître d’ouvrage"], ["ex", "Exploitant"], ["st", "Sous-traitant"]];
+const PP_TXT = {
+  secu: ["Le sous-traitant qui intervient sur le chantier doit respecter la règlementation en vigueur concernant le port et l’utilisation des EPI/EPC.",
+    "Ces derniers doivent être en bon état et en conformité avec la règlementation. Les EPI et EPC sont à la charge du prestataire.",
+    "Une intervention sur la structure peut impliquer d’accéder ou de travailler en hauteur. Il appartient à l’Entreprise de s’assurer de la conformité des moyens utilisés et des qualifications du personnel intervenant.",
+    "Toute personne intervenant sur un chantier doit avoir sa (ou ses) formation(s) et/ou habilitation(s) à jour et valide sur toute la durée du chantier. Toutes les règles de sécurité concernant le travail en hauteur, et sous-tension, doivent être respectées.",
+    CONFIG.ppDonneur + " vérifie et contrôle le respect des règles de sécurité par le ou les prestataires intervenant sur le chantier."],
+  prev: ["Avant le début des travaux et à l’initiative de l’employeur de l’Entreprise Utilisatrice (EU), les employeurs définissent à l’issue d’une inspection commune les mesures à prendre par chacun d’entre eux en vue d’éviter les risques professionnels, qui peuvent résulter de l’exercice simultané, en un même lieu, des installations et activités des deux entreprises.",
+    "Textes de référence : Articles Lp. 4511-1 et suivants, et Articles A. 4511-1 et suivants."],
+  insp: "L'inspection commune se déroule à l'initiative de l'employeur de l'EU. Au cours de l'inspection commune les actions suivantes doivent être entreprises :",
+  risksA: "Il est conseillé d’établir un plan de prévention dès lors que les salariés sont susceptibles d’être exposés à des travaux dangereux comportant l’un des risques suivants :",
+  risksB: "Détailler, pour chaque risque identifié, sa nature et sa localisation ainsi que les mesures de prévention prises, et qui a pris ces mesures (EU ou EE). Avant le début des travaux et sur le lieu même de leur exécution, l’employeur de l’entreprise intervenante fait connaître à l’ensemble des salariés qu’il affecte à ces travaux, les dangers spécifiques auxquels ils sont exposés et les mesures prises pour prévenir ces dangers.",
+  isole: "Lorsque les travaux sont effectués de nuit, ou dans un lieu isolé, ou à un moment où l’activité de l’entreprise utilisatrice est interrompue, l’employeur de l’entreprise intervenante prend les dispositions nécessaires pour qu’aucun salarié ne travaille de façon isolée en un point où il ne peut être secouru à bref délai en cas d’accident.",
+  mat: "Lorsque l'entreprise utilisatrice met des matériels à disposition de l'entreprise extérieure intervenante, le responsable de cette dernière vérifie, avant emploi de ces matériels, qu'ils sont en bon état et que ses salariés savent et peuvent les utiliser dans des conditions normales de sécurité.",
+  orga: ["L’EU assure la coordination des mesures de prévention qu'elle prend et de celles que prend l'ensemble des chefs d'entreprises extérieures.",
+    "L’EU a le pouvoir de suspendre ou d'arrêter une opération si les mesures de prévention ne sont pas respectées.",
+    "Chaque chef d'entreprise extérieure est responsable de l'application des mesures de prévention nécessaires à la protection de son personnel.",
+    "Chaque chef d'entreprise extérieure doit désigner son représentant sur le site.",
+    "Chaque chef d'entreprise extérieure n'a autorité que sur son personnel.",
+    "Tout incident ou accident, doit être communiqué à l’EU afin que celle-ci puisse prendre les mesures conservatoires nécessaires."],
+  valid: "Les travaux ne peuvent être entrepris qu'après accord des employeurs sur les mesures prévues. Le plan de prévention doit être validé par les employeurs de l’entreprise utilisatrice (EU) et les entreprises extérieures (EE).",
+  env: ["Les bonnes pratiques environnementales listées ci-dessous sont à respecter par toute entreprise et toute personne intervenant sur le chantier.",
+    "Respecter les dispositions légales, réglementaires et autres applicables, en matière environnementale",
+    "Réduire la consommation d’énergie et de ressources naturelles",
+    "Réduire les coûts énergétiques des chantiers et la part des énergies fossiles utilisées : optimisation des transports, adoption de l’écoconduite, etc.",
+    "Gérer et réduire la consommation des déchets sur les chantiers",
+    "Assurer la propreté des chantiers, le tri et le recyclage des déchets",
+    "Prévenir et limiter toute pollution",
+    "Prévenir le bruit en utilisant du matériel approprié",
+    "Anticiper les risques de pollution notamment les fuites de produits dangereux si présents"]
+};
+function newPP() {
+  return {
+    on: false, dateDebut: "", chantier: "", kwc: "", kva: "", email: "", adresse: "", tel: "",
+    acces: "", faitage: "", egout: "", marque: "", modele: "", nb: "", wc: "", integ: [], ond: [], photos: [],
+    eu: "", euRep: "", elabNom: "", elabPrenom: "", elabQualif: "", elabCoord: "", ctNom: "", ctPrenom: "", ctCoord: "",
+    nature: "", dDeb: "", dFin: "", duree: "",
+    insp: {delim: "", zones: "", voies: "", date: "", ent: ""}, ee: [], risks: {}, rdet: [], isole: [], inst: [], mat: [], cons: {}, autres: [], val: [],
+    sg: {mo: {nom: "", date: ""}, ex: {nom: "", date: ""}, st: {nom: "", date: ""}}
+  };
+}
+// Pré-remplit depuis la fiche les champs du plan encore vides (n'écrase jamais une saisie)
+function ppPrefill(s) {
+  const p = s.pp, g = s.g, set = (k, v) => { if (v && !String(p[k] ?? "").trim()) p[k] = v; };
+  set("dateDebut", g.dateVisite); set("chantier", g.projet || g.client); set("adresse", g.adresse);
+  set("kwc", ((g.designation || "").match(/(\d+(?:[.,]\d+)?)\s*kwc/i) || [])[1]);
+  set("acces", s.accesToiture); set("eu", g.client); set("ctNom", g.technicien);
+  set("nature", "Maintenance de centrale photovoltaïque" + (g.types.length ? " (" + g.types.join(", ") + ")" : "") + (g.intervention ? " - " + g.intervention : ""));
+  set("dDeb", g.dateVisite); set("dFin", s.fin.date || g.dateVisite);
+  if (!p.ond.length) {
+    const m = new Map();
+    s.inverters.forEach(o => { if (!o.marque && !o.modele) return; const k = o.marque + "|" + o.modele; m.set(k, (m.get(k) || 0) + 1); });
+    m.forEach((n, k) => { const [marque, modele] = k.split("|"); p.ond.push({marque, modele, qte: String(n)}); });
+  }
+  if (!p.ee.length && g.societe) p.ee.push({ent: g.societe, activite: p.nature, planning: [fmtDate(p.dDeb), fmtDate(p.dFin)].filter(Boolean).join(" au ")});
+}
 
 /* Logo CIRCET Energy (issu de l'en-tête du Word FO E&M 004) */
 const LOGO = "data:image/png;base64,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";
@@ -190,19 +298,100 @@ function metaOf(s) {
 const settings = {
   get endpoint() { try { return localStorage.getItem("pv.endpoint") || CONFIG.endpoint; } catch { return CONFIG.endpoint; } },
   set endpoint(v) { try { localStorage.setItem("pv.endpoint", v); } catch {} },
+  get clientsUrl() { try { return localStorage.getItem("pv.clientsUrl") || ""; } catch { return ""; } },
+  set clientsUrl(v) { try { localStorage.setItem("pv.clientsUrl", v); } catch {} },
   get tech() { try { return localStorage.getItem("pv.tech") || ""; } catch { return ""; } },
   set tech(v) { try { localStorage.setItem("pv.tech", v); } catch {} }
 };
+
+/* ============ Clients Dolibarr (via un flux : la clé API ne doit jamais figurer dans cette page publique) ============
+   Le flux renvoie un tableau JSON de tiers. Noms de champs acceptés : ceux de l'API Dolibarr (nom/name, address, zip, town, email, phone, code_client)
+   ou les formes françaises (adresse, cp, ville, tel, ref). Liste mise en cache sur l'appareil pour fonctionner hors ligne. */
+let clientsMem = null;
+const normClient = c => ({id: String(c.id ?? ""), ref: c.code_client || c.ref || "", nom: String(c.nom || c.name || "").trim(), adresse: c.adresse || c.address || "", cp: c.cp || c.zip || "", ville: c.ville || c.town || "", email: c.email || "", tel: c.tel || c.phone || "", projet: c.projet || ""});
+const clients = () => clientsMem || (clientsMem = (lsGet("pv.clients") || {}).items || []);
+async function refreshClients(force = false) {
+  const url = settings.clientsUrl; if (!url) return false;
+  const cache = lsGet("pv.clients");
+  if (!force && cache && Date.now() - cache.at < 12 * 3600e3) return true;
+  try {
+    const r = await fetch(url, {cache: "no-store"}); if (!r.ok) throw new Error("HTTP " + r.status);
+    let j = await r.json(); if (!Array.isArray(j)) j = j.value || j.body || [];
+    const items = j.map(normClient).filter(c => c.nom).sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+    clientsMem = items; lsSet("pv.clients", {at: Date.now(), items});
+    return true;
+  } catch (e) { console.error(e); return false; }
+}
+// Applique le client choisi à la fiche (et au plan de prévention s'il est activé)
+function applyClient(c) {
+  const g = cur.g, addr = [c.adresse, [c.cp, c.ville].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  g.client = c.nom; g.clientId = c.id; if (addr) g.adresse = addr; if (c.projet && !g.projet) g.projet = c.projet;
+  if (cur.pp && cur.pp.on) { cur.pp.eu = c.nom; if (addr) cur.pp.adresse = addr; if (c.email) cur.pp.email = c.email; if (c.tel) cur.pp.tel = c.tel; }
+  else if (cur.pp) { if (c.email) cur.pp.email = c.email; if (c.tel) cur.pp.tel = c.tel; }
+}
+
+/* ============ Accès : identifiant + mot de passe ============
+   ATTENTION : contrôle effectué dans le navigateur, sur une page publique. Il écarte les curieux mais ne remplace pas
+   une authentification serveur (le code et acces.json sont lisibles par quiconque ouvre la page).
+   Comptes : acces.json {users:[{id, nom, salt, hash, iter}]}, généré avec generer-acces.html (outil local, non publié). */
+const AUTH = {key: "pv.session", days: 30, iter: 150000};
+const b64d = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function pbkdf2(pw, salt, iter) {
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({name: "PBKDF2", hash: "SHA-256", salt, iterations: iter}, k, 256));
+}
+const sameBytes = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+async function loadAccess() {
+  try { const r = await fetch("acces.json", {cache: "no-cache"}); if (r.ok) { const j = await r.json(); if (Array.isArray(j.users)) { lsSet("pv.access", j); return j; } } } catch {}
+  return lsGet("pv.access");
+}
+async function checkLogin(users, id, pw) {
+  const u = users.find(x => x.id.toLowerCase() === id.trim().toLowerCase());
+  if (!u) { await pbkdf2(pw, new Uint8Array(16), AUTH.iter); return null; } // même durée que pour un compte existant
+  return sameBytes(await pbkdf2(pw, b64d(u.salt), u.iter || AUTH.iter), b64d(u.hash)) ? u : null;
+}
+const session = () => { const s = lsGet(AUTH.key); return s && s.until > Date.now() ? s : null; };
+function startApp() { showHome(); refreshRemoteForm(); refreshClients(); }
+function showLogin(access) {
+  $top.replaceChildren(h("h1", {}, "Maintenance centrale PV"));
+  if (!access || !access.users || !access.users.length) { $main.replaceChildren(h("div", {class: "banner warn"}, "Accès non configuré : connexion réseau requise au premier lancement.")); return; }
+  const id = h("input", {type: "text", autocomplete: "username", autocapitalize: "none", autocorrect: "off", required: true});
+  const pw = h("input", {type: "password", autocomplete: "current-password", required: true});
+  const msg = h("div", {class: "mute", role: "alert", style: "min-height:20px"});
+  let fails = 0, lockUntil = 0;
+  const submit = async e => {
+    e.preventDefault();
+    if (Date.now() < lockUntil) { msg.textContent = "Trop d'essais. Réessayez dans " + Math.ceil((lockUntil - Date.now()) / 1000) + " s."; return; }
+    if (!(window.crypto && crypto.subtle)) { msg.textContent = "Navigateur non compatible (connexion sécurisée requise)."; return; }
+    msg.textContent = "Vérification…";
+    const u = await checkLogin(access.users, id.value, pw.value);
+    if (!u) { fails++; pw.value = ""; if (fails >= 5) { lockUntil = Date.now() + 30000; fails = 0; } msg.textContent = "Identifiant ou mot de passe incorrect."; return; }
+    lsSet(AUTH.key, {id: u.id, nom: u.nom || u.id, until: Date.now() + AUTH.days * 864e5});
+    if (u.nom && !settings.tech) settings.tech = u.nom;
+    startApp();
+  };
+  $main.replaceChildren(h("form", {class: "card", onsubmit: submit, style: "max-width:420px;margin:40px auto;display:grid;gap:12px"},
+    h("h2", {style: "margin:0"}, "Connexion"),
+    h("label", {class: "f"}, h("span", {}, "Identifiant"), id), h("label", {class: "f"}, h("span", {}, "Mot de passe"), pw),
+    msg, h("button", {class: "btn pri", type: "submit"}, "Se connecter")));
+}
+async function boot() {
+  const local = location.protocol === "file:" || ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+  if (!CONFIG.loginRequired || local) return startApp();
+  const access = await loadAccess(), s = session();
+  if (s && access && access.users.some(u => u.id === s.id)) return startApp();
+  lsSet(AUTH.key, null); showLogin(access);
+}
 
 /* ============ Modèle ============ */
 function newInverter() { return {id: uid(), marque: "", modele: "", serie: "", mppt: "", puissance: "", risoP: "", risoM: "", rows: {}, strings: []}; }
 function newReport() {
   return {
     id: uid(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), status: "draft",
-    g: {client: "", projet: "", designation: "", adresse: "", miseService: "", dateVisite: today(), types: [], typeAutre: "", intervention: "", societe: "Circet Energy", technicien: settings.tech, meteo: "", temperature: ""},
+    g: {client: "", clientId: "", projet: "", designation: "", adresse: "", miseService: "", dateVisite: today(), types: [], typeAutre: "", intervention: "", societe: "Circet Energy", technicien: settings.tech, meteo: "", temperature: ""},
     comBat: "", accesToiture: "", t: {}, divis: [], dcs: [], photos: [],
     htaApplicable: false, index: {prod: "", conso: ""}, sup: {marque: "", modele: "", commentaires: ""},
-    comOnd: "", inverters: [newInverter()], synth: [], fin: {date: "", meteo: ""},
+    comOnd: "", inverters: [newInverter()], synth: [], fin: {date: "", meteo: ""}, form: clone(activeForm()), pp: newPP(),
     sig: {tech: "", client: ""}, clientName: "", signedAt: null, sentAt: null
   };
 }
@@ -210,6 +399,12 @@ function duplicateOf(s) {
   const n = newReport();
   Object.assign(n.g, {client: s.g.client, projet: s.g.projet, designation: s.g.designation, adresse: s.g.adresse, miseService: s.g.miseService, societe: s.g.societe, technicien: settings.tech || s.g.technicien});
   n.htaApplicable = s.htaApplicable; n.sup.marque = s.sup.marque; n.sup.modele = s.sup.modele;
+  if (s.pp) {
+    n.pp.on = s.pp.on;
+    ["eu", "euRep", "elabNom", "elabPrenom", "elabQualif", "elabCoord", "kwc", "kva", "email", "tel", "acces", "faitage", "egout", "marque", "modele", "nb", "wc"].forEach(k => n.pp[k] = s.pp[k]);
+    n.pp.ond = clone(s.pp.ond); n.pp.integ = clone(s.pp.integ);
+    if (n.pp.on) ppPrefill(n);
+  }
   n.divis = s.divis.map(d => ({id: uid(), name: d.name, rows: {}}));
   n.dcs = s.dcs.map(d => ({id: uid(), name: d.name, rows: {}}));
   n.inverters = s.inverters.map(o => ({...newInverter(), marque: o.marque, modele: o.modele, serie: o.serie, mppt: o.mppt, puissance: o.puissance, strings: o.strings.map(x => ({id: uid(), n: x.n, i: "", v: "", obs: ""}))}));
@@ -217,6 +412,7 @@ function duplicateOf(s) {
 }
 const tbl = (s, key) => (s.t[key] ||= {});
 function collectTables(s) {
+  useForm(s);
   const out = [];
   const add = (sec, title, items, rows, key) => out.push({sec, title, items, rows, key});
   add(1, "Bâtiment / structure porteuse", ITEMS.batiment, tbl(s, "batiment"), "batiment");
@@ -287,17 +483,61 @@ async function showHome() {
 }
 async function openSettings() {
   const ep = h("input", {type: "url", value: settings.endpoint, placeholder: "https://prod-xx.westeurope.logic.azure.com/…"});
+  const cu = h("input", {type: "url", value: settings.clientsUrl, placeholder: "https://prod-xx.westeurope.logic.azure.com/…"});
   const r = await modal("Réglages", h("div", {class: "grid", style: "grid-template-columns:1fr"},
     h("label", {class: "f"}, h("span", {}, "Destinataire (fixe)"), h("input", {type: "text", value: CONFIG.to, disabled: true})),
     h("label", {class: "f"}, h("span", {}, "URL d'envoi automatique (flux Power Automate)"), ep),
-    h("p", {class: "mute"}, "Sans URL, le PDF est partagé via l'application mail de l'appareil à la signature.")),
+    h("p", {class: "mute"}, "Sans URL, le PDF est partagé via l'application mail de l'appareil à la signature."),
+    session() ? h("button", {class: "btn sm danger", onclick: () => { lsSet(AUTH.key, null); location.reload(); }}, "Se déconnecter (" + session().nom + ")") : null,
+    h("label", {class: "f"}, h("span", {}, "URL de la liste clients (flux Dolibarr)"), cu),
+    h("button", {class: "btn sm", onclick: async () => {
+      settings.clientsUrl = cu.value.trim(); toast("Actualisation de la liste clients…", 8000);
+      const ok = await refreshClients(true); toast(ok ? clients().length + " client(s) chargé(s)" : "Échec du chargement (URL, réseau ou réponse du flux).", 5000);
+    }}, "Actualiser la liste des clients" + (clients().length ? " (" + clients().length + " en mémoire)" : "")),
+    h("button", {class: "btn", onclick: () => { document.querySelectorAll("dialog").forEach(d => { d.close(); d.remove(); }); openFormEditor(); }}, "Modifier le formulaire (contrôles)…")),
     [{label: "Fermer", val: false}, {label: "Enregistrer", val: true, cls: "pri"}]);
-  if (r) { settings.endpoint = ep.value.trim(); toast("Réglages enregistrés"); }
+  if (r) { settings.endpoint = ep.value.trim(); settings.clientsUrl = cu.value.trim(); toast("Réglages enregistrés"); }
+}
+
+/* Éditeur du formulaire : un contrôle par ligne, « Libellé | Moyen » (moyen = Visuel par défaut) */
+async function openFormEditor() {
+  const f = activeForm();
+  const secIn = {}, grpIn = {};
+  const box = h("div", {style: "display:grid;gap:8px"},
+    h("p", {class: "mute"}, "Un contrôle par ligne, au format « Libellé | Moyen » (Moyen facultatif, « Visuel » par défaut). Les modifications s'appliquent aux NOUVELLES fiches ; les fiches existantes gardent leur formulaire."),
+    h("h3", {}, "Titres des sections"));
+  for (const k of Object.keys(DEF_SECTIONS)) { secIn[k] = h("input", {type: "text", value: f.sections[k]}); box.append(secIn[k]); }
+  box.append(h("h3", {}, "Contrôles"));
+  for (const [k, t] of FORM_GROUPS) {
+    grpIn[k] = h("textarea", {rows: Math.min(10, f.items[k].length + 1), style: "width:100%"}); grpIn[k].value = f.items[k].map(([l, m]) => m === "Visuel" ? l : l + " | " + m).join("\n");
+    box.append(h("label", {class: "f"}, h("span", {}, t), grpIn[k]));
+  }
+  const file = h("input", {type: "file", accept: "application/json,.json", style: "display:none", onchange: async () => {
+    try {
+      const g = cleanForm(JSON.parse(await file.files[0].text())); if (!g) throw 0;
+      for (const [k] of FORM_GROUPS) grpIn[k].value = g.items[k].map(([l, m]) => m === "Visuel" ? l : l + " | " + m).join("\n");
+      for (const k of Object.keys(DEF_SECTIONS)) secIn[k].value = g.sections[k];
+      toast("Fichier chargé — cliquez sur Enregistrer pour l'appliquer.");
+    } catch { toast("Fichier invalide."); }
+  }});
+  const read = () => cleanForm({
+    sections: Object.fromEntries(Object.entries(secIn).map(([k, e]) => [k, e.value])),
+    items: Object.fromEntries(Object.entries(grpIn).map(([k, e]) => [k, e.value.split("\n").map(x => x.trim()).filter(Boolean).map(x => { const [l, ...m] = x.split("|"); return [l.trim(), m.join("|").trim() || "Visuel"]; })]))
+  });
+  box.append(h("div", {class: "bar"},
+    h("button", {class: "btn sm", onclick: () => saveBlob(new Blob([JSON.stringify(read(), null, 1)], {type: "application/json"}), "formulaire.json")}, "Exporter formulaire.json"),
+    h("button", {class: "btn sm", onclick: () => file.click()}, "Importer…"), file),
+    h("p", {class: "mute"}, "Pour diffuser à tous les téléphones : exporter, puis déposer formulaire.json dans le dépôt GitHub à côté de index.html."));
+  const r = await modal("Modifier le formulaire", box, [{label: "Fermer", val: "x"}, {label: "Rétablir l'original", val: "reset", cls: "danger"}, {label: "Enregistrer", val: "save", cls: "pri"}]);
+  if (r === "save") { lsSet("pv.form", read()); toast("Formulaire enregistré (nouvelles fiches)."); }
+  else if (r === "reset" && await ask("Rétablir le formulaire ?", "Revient au formulaire diffusé (formulaire.json) ou, à défaut, à l'original FO E&M 004 v2.")) { lsSet("pv.form", null); toast("Formulaire rétabli."); }
 }
 
 /* ============ Vue Formulaire ============ */
 async function openReport(id) {
   cur = await DB.get(id);
+  useForm(cur);
+  if (!cur.pp) cur.pp = newPP();
   ro = cur.status !== "draft";
   openSecs = new Set([0]);
   $top.replaceChildren(
@@ -318,7 +558,7 @@ function render() {
         h("button", {class: "btn sm", onclick: async () => { const n = duplicateOf(s); cur = n; await saveNow(); openReport(n.id); }}, "Dupliquer en nouvelle fiche"))));
   }
   const fs = h("fieldset", {disabled: ro});
-  fs.append(secGeneral(), secBatiment(), secComptage(), secAC(), secSecurite(), secSupervision(), secOnduleurs(), secAnnexe(), secFin());
+  fs.append(secGeneral(), secPlan(), secBatiment(), secComptage(), secAC(), secSecurite(), secSupervision(), secOnduleurs(), secAnnexe(), secFin());
   form.append(fs);
   $main.replaceChildren(form);
   updateCounters();
@@ -379,6 +619,23 @@ function checklist(rows, items) {
 }
 const tableBlock = (title, items, rows) => [h("h3", {}, title), checklist(rows, items)];
 
+// Champ client avec recherche dans la liste Dolibarr ; la saisie libre reste possible (liste absente ou client inconnu)
+function clientPicker() {
+  const g = cur.g, all = clients();
+  const fold = t => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const el = h("input", {type: "text", autocomplete: "off", placeholder: all.length ? "Rechercher dans Dolibarr ou saisir librement" : ""}); el.value = g.client;
+  const list = h("div", {class: "pick", hidden: true});
+  const show = () => {
+    const q = fold(el.value).split(/\s+/).filter(Boolean);   // tous les mots saisis doivent apparaître (ordre libre, sans accents)
+    const res = !q.join("").length || q.join("").length < 2 || ro ? [] : all.filter(c => { const s = fold(c.nom + " " + c.ville + " " + c.ref); return q.every(w => s.includes(w)); }).slice(0, 8);
+    list.replaceChildren(...res.map(c => h("button", {type: "button", onclick: () => { applyClient(c); toast("Client repris depuis Dolibarr"); rerender(); }},
+      c.nom, h("small", {}, [c.ref, [c.cp, c.ville].filter(Boolean).join(" ")].filter(Boolean).join(" · ")))));
+    list.hidden = !res.length;
+  };
+  el.addEventListener("input", () => { g.client = el.value; g.clientId = ""; save(); show(); });
+  el.addEventListener("blur", () => setTimeout(() => { list.hidden = true; }, 250));
+  return h("div", {}, h("label", {class: "f"}, h("span", {}, "Client / Maître de l'ouvrage" + (all.length ? " (liste Dolibarr : " + all.length + ")" : "")), el), list);
+}
 function secGeneral() {
   const g = cur.g;
   const types = h("div", {class: "chk"}, MAINT_TYPES.map(t => h("label", {}, h("input", {type: "checkbox", checked: g.types.includes(t), onchange: e => {
@@ -386,7 +643,7 @@ function secGeneral() {
   }}), t)));
   return section(0, "Informations générales",
     h("div", {class: "grid"},
-      inp("Client / Maître de l'ouvrage", g, "client", {after: () => {}}), inp("Référence projet / contrat", g, "projet"),
+      clientPicker(), inp("Référence projet / contrat", g, "projet"),
       inp("Désignation de l'installation (puissance kWc)", g, "designation"), inp("Adresse du site", g, "adresse"),
       inp("Date de mise en service", g, "miseService", {type: "date"}), inp("Date de la visite", g, "dateVisite", {type: "date"}),
       inp("N° d'intervention / BT", g, "intervention"), inp("Société intervenante", g, "societe"),
@@ -496,6 +753,67 @@ function importNok() {
   toast(n ? n + " ligne(s) ajoutée(s)" : "Aucun nouveau NOK à importer"); if (n) rerender();
 }
 
+/* ---- Plan de prévention (section du formulaire) ---- */
+function ppRepeat(list, labelOne, fields, mk, addLabel) {
+  return h("div", {}, list.map((x, i) => h("div", {class: "synth"},
+    h("div", {class: "bar", style: "justify-content:space-between;align-items:center;margin:0"}, h("b", {}, labelOne + " " + (i + 1)), h("button", {class: "btn sm danger", onclick: () => { list.splice(i, 1); rerender(); }}, "Supprimer")),
+    fields.map(([k, l, o]) => inp(l, x, k, o || {})))),
+    h("button", {class: "btn", onclick: () => { list.push(mk()); rerender(); }}, addLabel));
+}
+function secPlan() {
+  const p = cur.pp, G = (...c) => h("div", {class: "grid"}, ...c), note = t => h("p", {class: "mute"}, t);
+  const toggle = h("div", {class: "chk"}, h("label", {}, h("input", {type: "checkbox", checked: p.on, onchange: e => { p.on = e.target.checked; if (p.on) ppPrefill(cur); rerender(); }}), "Joindre un plan de prévention à cette fiche"));
+  if (!p.on) return section(10, "Plan de prévention (document distinct)", toggle, note("Le plan de prévention est un document distinct de la fiche, imprimé en tête du même PDF. Les champs communs sont pré-remplis depuis la fiche."));
+  const sign = ([k, l]) => h("div", {}, h("b", {}, l), G(inp("Nom", p.sg[k], "nom"), inp("Date", p.sg[k], "date", {type: "date"})), sigPad(l, "pp_" + k));
+  return section(10, "Plan de prévention (document distinct)", toggle,
+    h("div", {class: "bar"}, h("button", {class: "btn sm", onclick: () => { ppPrefill(cur); toast("Champs vides pré-remplis depuis la fiche"); rerender(); }}, "↻ Pré-remplir depuis la fiche")),
+    note("Document distinct imprimé en tête du PDF, avant la fiche de maintenance. Les champs déjà saisis ne sont jamais écrasés."),
+    G(inp("Date de début du plan de prévention", p, "dateDebut", {type: "date"}), inp("Chantier", p, "chantier"), inp("Puissance (kWc)", p, "kwc", {mode: "decimal"}), inp("Puissance (kVA)", p, "kva", {mode: "decimal"})),
+    h("h3", {}, "1. Adresse & contact client"),
+    G(inp("Email", p, "email", {type: "email"}), inp("Adresse", p, "adresse"), inp("Téléphone", p, "tel", {type: "tel"})),
+    h("h3", {}, "2. Accès chantier (toiture)"),
+    G(inp("Accès toiture (type, précisions)", p, "acces"), inp("Hauteur bâtiment : faîtage", p, "faitage"), inp("Hauteur bâtiment : égout", p, "egout"),
+      inp("Marque panneaux", p, "marque"), inp("Modèle", p, "modele"), inp("Nombre panneaux", p, "nb", {mode: "numeric"}), inp("Puissance unitaire en W", p, "wc", {mode: "numeric"})),
+    h("h3", {}, "Système d'intégration"), ppRepeat(p.integ, "Élément", [["v", "Système d'intégration"]], () => ({v: ""}), "＋ Ajouter"),
+    h("h3", {}, "Onduleurs"), ppRepeat(p.ond, "Onduleur", [["marque", "Marque"], ["modele", "Modèle"], ["qte", "Quantité", {mode: "numeric"}]], () => ({marque: "", modele: "", qte: "1"}), "＋ Ajouter un onduleur"),
+    h("h3", {}, "Photos des installations"), photoBlock(p.photos),
+    h("h3", {}, "3. Sécurité"), PP_TXT.secu.map(t => note(t)),
+    h("h3", {}, "4. Plan de prévention"), PP_TXT.prev.map(t => note(t)),
+    G(inp("Nom de l’Entreprise Utilisatrice (EU)", p, "eu"), inp("Représentant légal de l’EU (nom et prénom)", p, "euRep"),
+      inp("Élaboration du plan : nom", p, "elabNom"), inp("Élaboration du plan : prénom", p, "elabPrenom"), inp("Élaboration du plan : qualification", p, "elabQualif"), inp("Élaboration du plan : coordonnées", p, "elabCoord"),
+      inp("Chargé de travaux : nom", p, "ctNom"), inp("Chargé de travaux : prénom", p, "ctPrenom"), inp("Chargé de travaux : coordonnées", p, "ctCoord")),
+    inp("Nature de l'opération", p, "nature", {area: true}),
+    G(inp("Date prévisionnelle de début des travaux", p, "dDeb", {type: "date"}), inp("Date prévisionnelle de fin des travaux", p, "dFin", {type: "date"}), inp("Durée prévisible (heures)", p, "duree", {mode: "decimal"})),
+    h("h3", {}, "Inspection commune"), note(PP_TXT.insp),
+    G(inp("Délimitation du secteur d’intervention des EE : date", p.insp, "delim", {type: "date"}), inp("Matérialisation des zones dangereuses : date", p.insp, "zones", {type: "date"}),
+      inp("Indication des voies de circulation : date", p.insp, "voies", {type: "date"}), inp("Date de l’inspection commune", p.insp, "date", {type: "date"})),
+    inp("Entreprises présentes pour l’inspection commune", p.insp, "ent", {area: true}),
+    h("h3", {}, "Entreprises extérieures intervenantes (EE) et planning"),
+    ppRepeat(p.ee, "Entreprise", [["ent", "Entreprise"], ["activite", "Activité / intervention"], ["planning", "Planning d'intervention"]], () => ({ent: "", activite: "", planning: ""}), "＋ Ajouter une entreprise"),
+    h("h3", {}, "A) Risques générés par la coactivité"), note(PP_TXT.risksA),
+    h("div", {class: "chk", style: "flex-direction:column;align-items:stretch"}, PP_RISKS.map((t, i) => h("label", {}, h("input", {type: "checkbox", checked: !!p.risks[i], onchange: e => { p.risks[i] = e.target.checked; save(); }}), t))),
+    h("h3", {}, "B) Détail par risque identifié"), note(PP_TXT.risksB),
+    ppRepeat(p.rdet, "Risque", [["risque", "Risque"], ["nature", "Nature et localisation", {area: true}], ["mesures", "Mesures de prévention prises", {area: true}], ["par", "Mesures prises par (EU ou EE)"]], () => ({risque: "", nature: "", mesures: "", par: ""}), "＋ Ajouter un risque"),
+    h("h3", {}, "Dispositions en cas de travail isolé"), note(PP_TXT.isole),
+    ppRepeat(p.isole, "Travailleur isolé", [["poste", "Poste"], ["taches", "Tâches"], ["horaire", "Horaire de travail"], ["consignes", "Consignes spécifiques et moyens de communication", {area: true}]], () => ({poste: "", taches: "", horaire: "", consignes: ""}), "＋ Ajouter un travailleur isolé"),
+    h("h3", {}, "Installations mises à disposition par l’EU"), ppRepeat(p.inst, "Installation", [["type", "Type d'installation"]], () => ({type: ""}), "＋ Ajouter une installation"),
+    h("h3", {}, "Matériels mis à disposition par l’EU"), note(PP_TXT.mat),
+    ppRepeat(p.mat, "Matériel", [["desc", "Description du matériel"], ["cond", "Conditions d’utilisation"], ["date", "Date de vérification par l’EE", {type: "date"}]], () => ({desc: "", cond: "", date: ""}), "＋ Ajouter un matériel"),
+    h("h3", {}, "Consignes et procédures remises aux EE (dates de réception)"),
+    G(PP_CONSIGNES.map(([k, l]) => inp(l, p.cons, k, {type: "date"}))),
+    ppRepeat(p.autres, "Autre document", [["nom", "Document"], ["date", "Date de réception", {type: "date"}]], () => ({nom: "", date: ""}), "＋ Ajouter un document"),
+    h("h3", {}, "Organisation du plan de prévention"), PP_TXT.orga.map(t => note(t)),
+    h("h3", {}, "Validation du plan de prévention"), note(PP_TXT.valid),
+    p.val.map((x, i) => h("div", {class: "synth"},
+      h("div", {class: "bar", style: "justify-content:space-between;align-items:center;margin:0"}, h("b", {}, "Entreprise " + (i + 1)), h("button", {class: "btn sm danger", onclick: () => { p.val.splice(i, 1); delete cur.sig["ppv_" + x.id]; rerender(); }}, "Supprimer")),
+      G(inp("Nom de l'entreprise", x, "ent"), inp("Nom du signataire", x, "nom"), inp("Qualité du signataire", x, "qual"), inp("Date de signature", x, "date", {type: "date"})),
+      sigPad("Signature : " + (x.ent || "entreprise"), "ppv_" + x.id))),
+    h("button", {class: "btn", onclick: () => { p.val.push({id: uid(), ent: "", nom: "", qual: "", date: ""}); rerender(); }}, "＋ Ajouter une entreprise à valider"),
+    h("h3", {}, "5. Bonnes pratiques environnementales"), PP_TXT.env.map(t => note(t)),
+    h("h3", {}, "Signatures du plan de prévention"),
+    G(PP_SIGN.map(sign)));
+}
+
 /* ---- Signature ---- */
 function sigPad(label, who) {
   const c = h("canvas", {class: "sig" + (cur.sig[who] ? " done" : ""), width: 600, height: 220, "aria-label": "Zone de signature : " + label});
@@ -512,21 +830,21 @@ function sigPad(label, who) {
 }
 
 /* ---- Photos (illimitées, compressées) ---- */
-function photoBlock() {
+function photoBlock(arr = cur.photos) {
   const addFiles = async files => {
     const list = [...files]; if (!list.length) return;
     toast("Traitement de " + list.length + " photo(s)…");
-    for (const f of list) { try { cur.photos.push({id: uid(), desc: "", ...(await shrink(f))}); } catch (e) { console.error(e); } }
+    for (const f of list) { try { arr.push({id: uid(), desc: "", ...(await shrink(f))}); } catch (e) { console.error(e); } }
     rerender();
   };
   const cam = h("input", {type: "file", accept: "image/*", capture: "environment", hidden: true, onchange: e => addFiles(e.target.files)});
   const gal = h("input", {type: "file", accept: "image/*", multiple: true, hidden: true, onchange: e => addFiles(e.target.files)});
   return h("div", {},
     h("div", {class: "bar"}, cam, gal, h("button", {class: "btn pri", onclick: () => cam.click()}, "📷 Prendre une photo"), h("button", {class: "btn", onclick: () => gal.click()}, "🖼 Ajouter depuis la galerie")),
-    cur.photos.length ? h("div", {class: "photos"}, cur.photos.map((p, i) => h("div", {class: "photo"}, h("img", {src: p.img, alt: "Photo " + (i + 1)}),
+    arr.length ? h("div", {class: "photos"}, arr.map((p, i) => h("div", {class: "photo"}, h("img", {src: p.img, alt: "Photo " + (i + 1)}),
       h("div", {class: "b"}, h("input", {type: "text", placeholder: "Description / repérage (string, module colonne-ligne…)", value: p.desc, oninput: e => { p.desc = e.target.value; save(); }}),
-        h("button", {class: "btn sm danger", onclick: () => { cur.photos.splice(i, 1); rerender(); }}, "Supprimer"))))) : h("div", {class: "mute"}, "Aucune photo (" + cur.photos.length + ")."),
-    cur.photos.length ? h("div", {class: "mute", style: "margin-top:6px"}, cur.photos.length + " photo(s)") : null);
+        h("button", {class: "btn sm danger", onclick: () => { arr.splice(i, 1); rerender(); }}, "Supprimer"))))) : h("div", {class: "mute"}, "Aucune photo (" + arr.length + ")."),
+    arr.length ? h("div", {class: "mute", style: "margin-top:6px"}, arr.length + " photo(s)") : null);
 }
 function shrink(file, max = 1280, q = .72) {
   return new Promise((res, rej) => {
@@ -552,6 +870,11 @@ function validate(s) {
     const r = t.rows[i]; if (r?.r === "NOK" && !r.obs.trim()) e.push("NOK sans observation — " + t.title + " : " + l.split(" — ")[0]);
   }));
   if (!s.sig.tech) e.push("Signature du technicien manquante");
+  if (s.pp && s.pp.on) {
+    if (!s.pp.eu.trim()) e.push("Plan de prévention : entreprise utilisatrice non renseignée");
+    if (!s.pp.nature.trim()) e.push("Plan de prévention : nature de l'opération non renseignée");
+    if (!s.sig.pp_st) e.push("Plan de prévention : signature du sous-traitant manquante");
+  }
   return e;
 }
 async function signAndSend() {
@@ -559,6 +882,12 @@ async function signAndSend() {
   if (errs.length) { await modal("À compléter avant signature", h("ul", {}, errs.slice(0, 12).map(x => h("li", {}, x)), errs.length > 12 ? h("li", {}, "… et " + (errs.length - 12) + " autre(s)") : null), [{label: "Compris", val: true, cls: "pri"}]); return; }
   const empty = collectTables(cur).reduce((n, t) => n + t.items.filter((_, i) => !t.rows[i]?.r).length, 0);
   if (empty && !await ask("Contrôles sans résultat", empty + " contrôle(s) n'ont pas de résultat (OK / NOK / N/A). Signer quand même ?")) return;
+  if (cur.pp.on) {
+    const missing = PP_SIGN.filter(([k]) => !cur.sig["pp_" + k]).map(([, l]) => l);
+    if (missing.length && !await ask("Plan de prévention incomplet", "Signature manquante : " + missing.join(", ") + ". Signer et envoyer quand même ?")) return;
+    PP_SIGN.forEach(([k]) => { if (cur.sig["pp_" + k] && !cur.pp.sg[k].date) cur.pp.sg[k].date = today(); });
+    cur.pp.val.forEach(x => { if (cur.sig["ppv_" + x.id] && !x.date) x.date = today(); });
+  }
   if (!cur.fin.date) cur.fin.date = today();
   cur.signedAt = new Date().toISOString(); cur.status = "pending"; ro = true;
   await saveNow();
@@ -571,13 +900,13 @@ async function deliver(s) {
   let built;
   try { built = buildPdf(s); } catch (e) { console.error(e); toast("Génération du PDF impossible (bibliothèque non chargée ? connexion requise au 1er lancement)."); return; }
   const ep = settings.endpoint;
-  const subject = "Fiche de maintenance PV — " + (s.g.client || "client") + " — " + fmtDate(s.g.dateVisite);
+  const subject = "Fiche de maintenance PV" + (s.pp?.on ? " + plan de prévention" : "") + " — " + (s.g.client || "client") + " — " + fmtDate(s.g.dateVisite);
   const text = "Fiche de contrôle de maintenance signée.\nClient : " + s.g.client + "\nSite : " + s.g.adresse + "\nDate : " + fmtDate(s.g.dateVisite) + "\nTechnicien : " + s.g.technicien;
   if (ep) {
     toast("Envoi en cours…", 8000);
     try {
       const res = await fetch(ep, {method: "POST", headers: {"Content-Type": "text/plain;charset=UTF-8"}, body: JSON.stringify({to: CONFIG.to, subject, body: text, filename: built.name, pdfBase64: await b64(built.blob),
-        report: {id: s.id, client: s.g.client, site: s.g.adresse, date: s.g.dateVisite, technicien: s.g.technicien, nok: metaOf(s).nok}})});
+        report: {id: s.id, client: s.g.client, site: s.g.adresse, date: s.g.dateVisite, technicien: s.g.technicien, nok: metaOf(s).nok, planPrevention: !!s.pp?.on, clientId: s.g.clientId || ""}})});
       if (!res.ok) throw new Error("HTTP " + res.status);
       s.status = "sent"; s.sentAt = new Date().toISOString(); await DB.put(s); toast("✓ Fiche envoyée à " + CONFIG.to); return;
     } catch (e) { console.error(e); toast("Envoi impossible (" + (e.message || "réseau") + "). La fiche reste « à envoyer » : bouton Renvoyer."); return; }
@@ -597,6 +926,7 @@ function downloadPdf(s) { try { const b = buildPdf(s); saveBlob(b.blob, b.name);
 
 /* ============ PDF ============ */
 function buildPdf(s) {
+  useForm(s);
   const {jsPDF} = window.jspdf; const doc = new jsPDF({unit: "mm", format: "a4"});
   const san = t => String(t ?? "").replace(/[—–]/g, "-").replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/…/g, "...").replace(/[^\x00-\xFF]/g, "?");
   const M = 12, PW = 210, PH = 297, NAVY = [11, 79, 138];
@@ -613,7 +943,69 @@ function buildPdf(s) {
       {columnStyles: {0: {cellWidth: 72}, 1: {cellWidth: 16}, 2: {cellWidth: 16, halign: "center", fontStyle: "bold"}},
        didParseCell: d => { if (d.section === "body" && d.column.index === 2) { if (d.cell.raw === "OK") d.cell.styles.textColor = [27, 127, 59]; if (d.cell.raw === "NOK") { d.cell.styles.textColor = [198, 40, 40]; d.row.cells[3].styles.fillColor = [253, 234, 234]; } } }});
   };
+  const drawPhotos = list => {
+    const bw2 = (PW - 2 * M - 6) / 2, bh = 70;
+    list.forEach((p, i) => {
+      const col = i % 2; if (col === 0 && i > 0) y += bh + 14; if (col === 0) need(bh + 14);
+      if (y + bh + 14 > PH - 16 && col === 0) { doc.addPage(); y = TOP; }
+      const x = M + col * (bw2 + 6), k = Math.min(bw2 / p.w, bh / p.h), w = p.w * k, hh = p.h * k;
+      doc.addImage(p.img, "JPEG", x, y, w, hh); doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+      doc.text(doc.splitTextToSize(san("Photo " + (i + 1) + (p.desc ? " - " + p.desc : "")), bw2), x, y + bh + 4);
+    });
+    y += bh + 14;
+  };
   const g = s.g;
+  // ---- Document 1 : plan de prévention (distinct de la fiche, même PDF) ----
+  let ppPages = 0;
+  if (s.pp && s.pp.on) {
+    const p = s.pp, R = (a, f, n) => a.length ? a.map(f) : [Array(n).fill("-")];
+    const KV = rows => T(["Champ", "Valeur"], rows, {columnStyles: {0: {fontStyle: "bold", cellWidth: 62}}});
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(...NAVY); doc.text("PLAN DE PRÉVENTION - MAINTENANCE", PW / 2, y, {align: "center"});
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90); doc.text("Document distinct de la fiche de contrôle de maintenance qui suit", PW / 2, y + 6, {align: "center"}); doc.setTextColor(0); y += 12;
+    KV([["Date de début du plan de prévention", fmtDate(p.dateDebut)], ["Chantier", p.chantier], ["Puissance (kWc)", p.kwc], ["Puissance (kVA)", p.kva]]);
+    H1("1. Adresse & contact client"); KV([["Email", p.email], ["Adresse", p.adresse], ["Téléphone", p.tel]]);
+    H1("2. Accès chantier (toiture)");
+    KV([["Accès toiture", p.acces], ["Hauteur bâtiment : faîtage", p.faitage], ["Hauteur bâtiment : égout", p.egout], ["Marque des panneaux", p.marque], ["Modèle", p.modele], ["Nombre de panneaux", p.nb], ["Puissance unitaire (W)", p.wc], ["Système d'intégration", p.integ.map(x => x.v).filter(Boolean).join(", ")]]);
+    H2("Onduleurs"); T(["Marque", "Modèle", "Quantité"], R(p.ond, o => [o.marque, o.modele, o.qte], 3));
+    if (p.photos.length) { H2("Photos des installations (" + p.photos.length + ")"); y += 2; drawPhotos(p.photos); }
+    H1("3. Sécurité"); PP_TXT.secu.forEach(P);
+    H1("4. Plan de prévention"); PP_TXT.prev.forEach(P);
+    KV([["Entreprise utilisatrice (EU)", p.eu], ["Représentant légal de l'EU", p.euRep], ["Élaboration du plan : nom", p.elabNom], ["Élaboration du plan : prénom", p.elabPrenom], ["Élaboration du plan : qualification", p.elabQualif], ["Élaboration du plan : coordonnées", p.elabCoord],
+      ["Chargé de travaux : nom", p.ctNom], ["Chargé de travaux : prénom", p.ctPrenom], ["Chargé de travaux : coordonnées", p.ctCoord], ["Nature de l'opération", p.nature],
+      ["Début prévisionnel des travaux", fmtDate(p.dDeb)], ["Fin prévisionnelle des travaux", fmtDate(p.dFin)], ["Durée prévisible (heures)", p.duree]]);
+    H2("Inspection commune"); P(PP_TXT.insp);
+    KV([["Délimitation du secteur d'intervention des EE", fmtDate(p.insp.delim)], ["Matérialisation des zones dangereuses", fmtDate(p.insp.zones)], ["Indication des voies de circulation", fmtDate(p.insp.voies)], ["Date de l'inspection commune", fmtDate(p.insp.date)], ["Entreprises présentes", p.insp.ent]]);
+    H2("Entreprises extérieures intervenantes (EE) et planning d'intervention"); T(["Entreprise", "Activité / intervention", "Planning"], R(p.ee, x => [x.ent, x.activite, x.planning], 3));
+    H2("A) Risques générés par la coactivité"); P(PP_TXT.risksA);
+    T(["Risque", "Identifié"], PP_RISKS.map((t, i) => [t, p.risks[i] ? "Oui" : "-"]), {columnStyles: {1: {cellWidth: 20, halign: "center", fontStyle: "bold"}}});
+    H2("B) Détail par risque identifié"); P(PP_TXT.risksB);
+    T(["Risque", "Nature et localisation", "Mesures de prévention", "Prises par"], R(p.rdet, x => [x.risque, x.nature, x.mesures, x.par], 4));
+    H2("Dispositions en cas de travail isolé"); P(PP_TXT.isole);
+    T(["Poste", "Tâches", "Horaire de travail", "Consignes et moyens de communication"], R(p.isole, x => [x.poste, x.taches, x.horaire, x.consignes], 4));
+    H2("Équipements à l'usage des salariés des EE"); T(["Installations mises à disposition par l'EU"], R(p.inst, x => [x.type], 1));
+    P(PP_TXT.mat); T(["Matériel", "Conditions d'utilisation", "Vérification par l'EE"], R(p.mat, x => [x.desc, x.cond, fmtDate(x.date)], 3));
+    H2("Consignes et procédures remises aux entreprises extérieures");
+    T(["Document", "Date de réception"], [...PP_CONSIGNES.map(([k, l]) => [l, fmtDate(p.cons[k])]), ...p.autres.map(x => ["Autre : " + x.nom, fmtDate(x.date)])], {columnStyles: {1: {cellWidth: 32}}});
+    H2("Organisation du plan de prévention"); PP_TXT.orga.forEach(P);
+    H2("Validation du plan de prévention"); P(PP_TXT.valid);
+    const vsig = p.val.map(x => s.sig["ppv_" + x.id]);
+    T(["Entreprise", "Signataire", "Qualité", "Date", "Signature"], R(p.val, x => [x.ent, x.nom, x.qual, fmtDate(x.date), ""], 5),
+      {columnStyles: {4: {cellWidth: 42, minCellHeight: 16}},
+       didDrawCell: d => { const im = d.section === "body" && d.column.index === 4 && vsig[d.row.index]; if (im) doc.addImage(im, "PNG", d.cell.x + 1, d.cell.y + 1, 38, 14); }});
+    H1("5. Bonnes pratiques environnementales"); PP_TXT.env.forEach(P);
+    need(60); H1("Signatures du plan de prévention");
+    const sy2 = y + 2, bw3 = (PW - 2 * M - 12) / 3;
+    PP_SIGN.forEach(([k, lab], j) => {
+      const x = M + j * (bw3 + 6), img = s.sig["pp_" + k], sg = p.sg[k];
+      doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.text(san(lab + (sg.nom ? " : " + sg.nom : "")), x, sy2 + 3, {maxWidth: bw3});
+      doc.setDrawColor(180); doc.rect(x, sy2 + 8, bw3, 30);
+      if (img) doc.addImage(img, "PNG", x + 1, sy2 + 9, bw3 - 2, Math.min(28, (bw3 - 2) * 220 / 600));
+      doc.setFont("helvetica", "normal"); doc.text("Date : " + fmtDate(sg.date), x, sy2 + 43);
+    });
+    ppPages = doc.getNumberOfPages();
+    doc.addPage(); y = TOP + 2;
+  }
+  // ---- Document 2 : fiche de contrôle de maintenance (FO E&M 004 v2) ----
   doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(...NAVY); doc.text("FICHE DE CONTRÔLE DE MAINTENANCE", PW / 2, y, {align: "center"});
   doc.setFontSize(12); doc.text("CENTRALE PHOTOVOLTAÏQUE", PW / 2, y + 6, {align: "center"}); doc.setTextColor(0); y += 14;
   H1("Informations générales");
@@ -662,23 +1054,17 @@ function buildPdf(s) {
   // Photos
   if (s.photos.length) {
     doc.addPage(); y = TOP; H1("Relevé photographique des anomalies constatées (" + s.photos.length + ")");
-    const bw2 = (PW - 2 * M - 6) / 2, bh = 70;
-    s.photos.forEach((p, i) => {
-      const col = i % 2; if (col === 0 && i > 0) y += bh + 14; if (col === 0) need(bh + 14);
-      if (y + bh + 14 > PH - 16 && col === 0) { doc.addPage(); y = TOP; }
-      const x = M + col * (bw2 + 6), k = Math.min(bw2 / p.w, bh / p.h), w = p.w * k, hh = p.h * k;
-      doc.addImage(p.img, "JPEG", x, y, w, hh); doc.setFont("helvetica", "normal"); doc.setFontSize(8);
-      doc.text(doc.splitTextToSize(san("Photo " + (i + 1) + (p.desc ? " - " + p.desc : "")), bw2), x, y + bh + 4);
-    });
+    drawPhotos(s.photos);
   }
   const n = doc.getNumberOfPages();
   for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(110);
     const lw = 30; doc.addImage(LOGO, "PNG", M, 4, lw, lw * LOGO_RATIO);
     doc.setFont("helvetica", "bold"); doc.setTextColor(40); doc.setFontSize(8.5);
-    doc.text("Référence : FO E&M 004", PW - M, 10, {align: "right"}); doc.text("Version : 2", PW - M, 14.5, {align: "right"});
+    const isPP = i <= ppPages, pn = isPP ? i : i - ppPages, pt = isPP ? ppPages : n - ppPages;
+    doc.text(isPP ? "Plan de prévention - Maintenance" : "Référence : FO E&M 004", PW - M, 10, {align: "right"}); if (!isPP) doc.text("Version : 2", PW - M, 14.5, {align: "right"});
     doc.setDrawColor(200); doc.setLineWidth(.3); doc.line(M, 21, PW - M, 21);
     doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(110);
-    doc.text(san("Circet Energy - Fiche de contrôle de maintenance - Centrale photovoltaïque - " + (g.client || "")), M, PH - 8); doc.text("Page " + i + " / " + n, PW - M, PH - 8, {align: "right"}); }
+    doc.text(san("Circet Energy - " + (isPP ? "Plan de prévention - Maintenance - " : "Fiche de contrôle de maintenance - Centrale photovoltaïque - ") + (g.client || "")), M, PH - 8); doc.text("Page " + pn + " / " + pt, PW - M, PH - 8, {align: "right"}); }
   const name = ("Maintenance_PV_" + (g.client || "site") + "_" + (g.dateVisite || today())).replace(/[^\w\-]+/g, "_") + ".pdf";
   return {blob: doc.output("blob"), name};
 }
@@ -686,7 +1072,7 @@ function buildPdf(s) {
 /* ============ Démarrage ============ */
 window.addEventListener("beforeunload", () => { if (cur && saveTimer) saveNow(); });
 document.addEventListener("visibilitychange", () => { if (document.hidden && cur && saveTimer) saveNow(); });
-showHome();
+boot();
 </script>
 </body>
 </html>

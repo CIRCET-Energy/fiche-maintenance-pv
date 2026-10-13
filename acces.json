@@ -1,0 +1,26 @@
+{
+ "v": 1,
+ "users": [
+  {
+   "id": "edubois",
+   "nom": "Eric DUBOIS",
+   "salt": "kQ9/wq+G8ikntooKV7BkhQ==",
+   "hash": "mny6KmdTSySXwTZ0/acGOMEV/sMESw6xn4gHw4Sq16s=",
+   "iter": 150000
+  },
+  {
+   "id": "jdur",
+   "nom": "Julien DUR",
+   "salt": "NuoobY4G7wdSITSr1Az/Tg==",
+   "hash": "6utHkCQ0rOmVRlJc7k9jytrzfGJhz2RznGEFNxP+S1s=",
+   "iter": 150000
+  },
+  {
+   "id": "abizet",
+   "nom": "Angélique BIZET",
+   "salt": "OfbmPBKiwZsxUp9VC8ZbiA==",
+   "hash": "lbRMTMeePB7+Ys+PUooIDwDPGsAODWgPHQ3Od1KEl4g=",
+   "iter": 150000
+  }
+ ]
+}
